@@ -10,6 +10,12 @@ object VoiceCommandProcessor {
 
     private fun containsAny(text: String, vararg options: String) = options.any { text.contains(it) }
 
+    private fun stripFillerWords(text: String, fillers: Set<String>): String =
+        text.split(" ")
+            .filter { it.isNotBlank() && it !in fillers }
+            .joinToString(" ")
+            .trim()
+
     fun parse(rawInput: String): Command {
         val norm = normalize(rawInput)
         if (norm.isBlank()) return Command.Unknown(rawInput)
@@ -73,18 +79,16 @@ object VoiceCommandProcessor {
         }
 
         if (containsAny(norm, "gaana", "song", "music") && containsAny(norm, "chalao", "play", "bajao")) {
-            var query = norm
-            listOf("gaana", "song", "music", "chalao", "play", "bajao", "karo")
-                .forEach { query = query.replace(it, " ") }
-            query = query.replace(Regex("\\s+"), " ").trim()
+            val query = stripFillerWords(
+                norm, setOf("gaana", "song", "music", "chalao", "play", "bajao", "karo")
+            )
             if (query.isNotBlank()) return Command.PlaySong(query)
         }
 
         if (norm.contains("search")) {
-            var query = norm
-            listOf("google pe search karo", "google search", "search karo", "search kar do", "search for", "search")
-                .forEach { query = query.replace(it, " ") }
-            query = query.trim()
+            val query = stripFillerWords(
+                norm, setOf("google", "pe", "search", "karo", "kar", "do", "for")
+            )
             if (query.isNotBlank()) return Command.GoogleSearch(query)
         }
 
@@ -93,13 +97,9 @@ object VoiceCommandProcessor {
             if (verbMatch != null) {
                 val messageText = verbMatch.groupValues[2].trim()
                 val before = norm.substring(0, verbMatch.range.first)
-                val nameCandidate = before
-                    .replace("whatsapp", " ")
-                    .replace(Regex("\\b(pe|par|ko|message|send|to)\\b"), " ")
-                    .trim()
-                    .split(" ")
-                    .filter { it.isNotBlank() }
-                    .lastOrNull()
+                val nameCandidate = stripFillerWords(
+                    before, setOf("whatsapp", "pe", "par", "ko", "message", "send", "to")
+                ).split(" ").filter { it.isNotBlank() }.lastOrNull()
                 if (!nameCandidate.isNullOrBlank() && messageText.isNotBlank()) {
                     return Command.SendWhatsApp(nameCandidate, messageText)
                 }
@@ -107,10 +107,9 @@ object VoiceCommandProcessor {
         }
 
         if (norm.contains("call")) {
-            var name = norm
-            listOf("call", "karo", "kar do", "phone", "ko", "please", "kripya")
-                .forEach { name = name.replace(it, " ") }
-            name = name.trim()
+            val name = stripFillerWords(
+                norm, setOf("call", "karo", "kar", "do", "phone", "ko", "please", "kripya")
+            )
             if (name.isNotBlank()) return Command.CallContact(name)
         }
 
@@ -124,10 +123,10 @@ object VoiceCommandProcessor {
         }
 
         if (containsAny(norm, "open", "khol", "launch", "start")) {
-            var appName = norm
-            listOf("khol do", "open", "khol", "launch", "start", "karo", "please", "kripya", "mera", "the", "app")
-                .forEach { appName = appName.replace(it, " ") }
-            appName = appName.replace(Regex("\\s+"), " ").trim()
+            val appName = stripFillerWords(
+                norm,
+                setOf("khol", "do", "open", "launch", "start", "karo", "please", "kripya", "mera", "the", "app")
+            )
             if (appName.isNotBlank()) return Command.OpenApp(appName)
         }
 
