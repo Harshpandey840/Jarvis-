@@ -1,14 +1,18 @@
 package com.user.jarvis
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
+import android.provider.AlarmClock
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -22,6 +26,8 @@ class CommandExecutor(
     private val appLauncher = AppLauncher(context)
     private val contactResolver = ContactResolver(context)
     private val messageSender = MessageSender(context)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("jarvis_notes", Context.MODE_PRIVATE)
 
     fun execute(spokenText: String) {
         when (val command = VoiceCommandProcessor.parse(spokenText)) {
@@ -92,6 +98,47 @@ class CommandExecutor(
                 context.startActivity(intent)
                 onSpeak("${command.query} search kar raha hoon")
             }
+            is Command.PlaySong -> {
+                val encoded = URLEncoder.encode(command.query, "UTF-8")
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://www.youtube.com/results?search_query=$encoded")
+                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                context.startActivity(intent)
+                onSpeak("${command.query} bajane ja raha hoon")
+            }
+            is Command.SetAlarm -> {
+                val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                    if (command.hour in 0..23) {
+                        putExtra(AlarmClock.EXTRA_HOUR, command.hour)
+                        putExtra(AlarmClock.EXTRA_MINUTES, command.minute)
+                    }
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    context.startActivity(intent)
+                    onSpeak(
+                        if (command.hour in 0..23) "Alarm laga raha hoon"
+                        else "Alarm app khol raha hoon, time set kar lena"
+                    )
+                } catch (e: Exception) {
+                    onSpeak("Alarm nahi laga paya")
+                }
+            }
+            is Command.SaveNote -> {
+                val existing = prefs.getStringSet("notes", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+                existing.add(command.text)
+                prefs.edit().putStringSet("notes", existing).apply()
+                onSpeak("Note save kar diya")
+            }
+            Command.ReadNotes -> {
+                val notes = prefs.getStringSet("notes", setOf())?.toList() ?: listOf()
+                if (notes.isEmpty()) {
+                    onSpeak("Koi note nahi hai")
+                } else {
+                    onSpeak("Tumhare notes hain: " + notes.joinToString(". "))
+                }
+            }
             Command.TellTime -> {
                 val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
                 onSpeak("Abhi time hai $time")
@@ -119,10 +166,45 @@ class CommandExecutor(
                 setTorch(false)
                 onSpeak("Torch bandh kar diya")
             }
+            Command.OpenWifiSettings -> {
+                val intent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                onSpeak("WiFi settings khol raha hoon")
+            }
+            Command.OpenBluetoothSettings -> {
+                val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                onSpeak("Bluetooth settings khol raha hoon")
+            }
+            Command.SilentModeOn -> {
+                setRingerMode(AudioManager.RINGER_MODE_SILENT, "Silent kar diya")
+            }
+            Command.SilentModeOff -> {
+                setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
+            }
             is Command.Unknown -> {
                 onSpeak("Samajh nahi aaya")
             }
         }
+    }
+
+    private fun setRingerMode(mode: Int, successMessage: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (!notificationManager.isNotificationPolicyAccessGranted) {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            onSpeak("Pehle Jarvis ko 'Do Not Disturb' permission do")
+            return
+        }
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager.ringerMode = mode
+        onSpeak(successMessage)
     }
 
     private fun setTorch(on: Boolean) {
