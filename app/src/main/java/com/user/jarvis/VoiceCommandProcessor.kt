@@ -2,70 +2,87 @@ package com.user.jarvis
 
 object VoiceCommandProcessor {
 
-    fun parse(rawInput: String): Command {
-        val text = rawInput.trim()
-        val lower = text.lowercase()
+    private fun normalize(s: String): String =
+        s.trim().lowercase()
+            .replace(Regex("[^a-z0-9\\s]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
 
-        if (Regex("time (kya|batao)|kitna baja").containsMatchIn(lower)) {
+    private fun containsAny(text: String, vararg options: String) = options.any { text.contains(it) }
+
+    fun parse(rawInput: String): Command {
+        val norm = normalize(rawInput)
+        if (norm.isBlank()) return Command.Unknown(rawInput)
+
+        if (norm.contains("time") && containsAny(norm, "kya", "batao", "kitna baja")) {
             return Command.TellTime
         }
-        if (Regex("battery (kitni|batao|percent)").containsMatchIn(lower)) {
+
+        if (norm.contains("battery")) {
             return Command.TellBattery
         }
 
-        if (Regex("volume (badhao|badha do|increase|up)").containsMatchIn(lower)) {
-            return Command.VolumeUp
-        }
-        if (Regex("volume (kam karo|ghatao|decrease|down)").containsMatchIn(lower)) {
-            return Command.VolumeDown
+        if (norm.contains("volume")) {
+            if (containsAny(norm, "badhao", "badha do", "increase", "tez", " up")) return Command.VolumeUp
+            if (containsAny(norm, "kam karo", "ghatao", "decrease", " down", "kam kar")) return Command.VolumeDown
         }
 
-        if (Regex("(torch|flashlight|light) (jalao|on karo|on)").containsMatchIn(lower)) {
-            return Command.FlashlightOn
-        }
-        if (Regex("(torch|flashlight|light) (bandh karo|off karo|off)").containsMatchIn(lower)) {
-            return Command.FlashlightOff
+        if (containsAny(norm, "torch", "flashlight", "flash light") || norm.contains("light")) {
+            if (containsAny(norm, "jalao", "on karo", " on")) return Command.FlashlightOn
+            if (containsAny(norm, "bandh", "off karo", " off")) return Command.FlashlightOff
         }
 
-        Regex("^(google pe search karo|google search|search karo)\\s+(.+)$").find(lower)?.let {
-            return Command.GoogleSearch(it.groupValues[2].trim())
+        if (norm.contains("search")) {
+            var query = norm
+            listOf("google pe search karo", "google search", "search karo", "search kar do", "search for", "search")
+                .forEach { query = query.replace(it, " ") }
+            query = query.trim()
+            if (query.isNotBlank()) return Command.GoogleSearch(query)
         }
 
-        Regex("^whatsapp (pe |par )?(\\w+) ko (bolo|likho|message karo)\\s+(.+)$").find(lower)?.let {
-            return Command.SendWhatsApp(it.groupValues[2].trim(), it.groupValues[4].trim())
-        }
-        Regex("^whatsapp message\\s+(\\w+)\\s+(.+)$").find(lower)?.let {
-            return Command.SendWhatsApp(it.groupValues[1].trim(), it.groupValues[2].trim())
-        }
-
-        Regex("^(open|khol|khol do|launch)\\s+(.+)$").find(lower)?.let {
-            val appName = it.groupValues[2].trim()
-            return Command.OpenApp(appName)
-        }
-        Regex("^(.+?)\\s+khol( do)?$").find(lower)?.let {
-            return Command.OpenApp(it.groupValues[1].trim())
-        }
-
-        Regex("^call\\s+(.+)$").find(lower)?.let {
-            return Command.CallContact(it.groupValues[1].trim())
-        }
-        Regex("^(.+?)\\s+ko\\s+call\\s+karo$").find(lower)?.let {
-            return Command.CallContact(it.groupValues[1].trim())
-        }
-        Regex("^phone\\s+karo\\s+(.+?)\\s+ko$").find(lower)?.let {
-            return Command.CallContact(it.groupValues[1].trim())
+        if (norm.contains("whatsapp")) {
+            val verbMatch = Regex("(bolo|likho|message karo|send karo|kaho|msg karo)\\s+(.+)").find(norm)
+            if (verbMatch != null) {
+                val messageText = verbMatch.groupValues[2].trim()
+                val before = norm.substring(0, verbMatch.range.first)
+                val nameCandidate = before
+                    .replace("whatsapp", " ")
+                    .replace(Regex("\\b(pe|par|ko|message|send|to)\\b"), " ")
+                    .trim()
+                    .split(" ")
+                    .filter { it.isNotBlank() }
+                    .lastOrNull()
+                if (!nameCandidate.isNullOrBlank() && messageText.isNotBlank()) {
+                    return Command.SendWhatsApp(nameCandidate, messageText)
+                }
+            }
         }
 
-        Regex("^message\\s+(\\w+)\\s+(.+)$").find(lower)?.let {
-            return Command.SendMessage(it.groupValues[1].trim(), it.groupValues[2].trim())
-        }
-        Regex("^send message to\\s+(\\w+)\\s+saying\\s+(.+)$").find(lower)?.let {
-            return Command.SendMessage(it.groupValues[1].trim(), it.groupValues[2].trim())
-        }
-        Regex("^(\\w+)\\s+ko\\s+(bolo|likho|msg karo|message karo)\\s+(.+)$").find(lower)?.let {
-            return Command.SendMessage(it.groupValues[1].trim(), it.groupValues[3].trim())
+        if (norm.contains("call")) {
+            var name = norm
+            listOf("call", "karo", "kar do", "phone", "ko", "please", "kripya")
+                .forEach { name = name.replace(it, " ") }
+            name = name.trim()
+            if (name.isNotBlank()) return Command.CallContact(name)
         }
 
-        return Command.Unknown(text)
+        if (containsAny(norm, "message", "msg", "bolo", "likho") && !norm.contains("whatsapp")) {
+            Regex("^message\\s+(\\w+)\\s+(.+)$").find(norm)?.let {
+                return Command.SendMessage(it.groupValues[1], it.groupValues[2])
+            }
+            Regex("(\\w+)\\s+ko\\s+(bolo|likho|msg karo|message karo)\\s+(.+)").find(norm)?.let {
+                return Command.SendMessage(it.groupValues[1], it.groupValues[3])
+            }
+        }
+
+        if (containsAny(norm, "open", "khol", "launch", "start")) {
+            var appName = norm
+            listOf("khol do", "open", "khol", "launch", "start", "karo", "please", "kripya", "mera", "the", "app")
+                .forEach { appName = appName.replace(it, " ") }
+            appName = appName.replace(Regex("\\s+"), " ").trim()
+            if (appName.isNotBlank()) return Command.OpenApp(appName)
+        }
+
+        return Command.Unknown(rawInput)
     }
 }
