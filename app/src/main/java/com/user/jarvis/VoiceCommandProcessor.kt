@@ -32,6 +32,54 @@ object VoiceCommandProcessor {
             if (containsAny(norm, "bandh", "off karo", " off")) return Command.FlashlightOff
         }
 
+        if (norm.contains("wifi")) {
+            return Command.OpenWifiSettings
+        }
+        if (norm.contains("bluetooth")) {
+            return Command.OpenBluetoothSettings
+        }
+
+        if (containsAny(norm, "silent", "chup")) {
+            return Command.SilentModeOn
+        }
+        if (norm.contains("sound") && containsAny(norm, "on karo", "chalu karo", " on")) {
+            return Command.SilentModeOff
+        }
+
+        if (norm.contains("alarm")) {
+            val timeMatch = Regex("(\\d{1,2})(?::(\\d{2}))?").find(norm)
+            if (timeMatch != null) {
+                var hour = timeMatch.groupValues[1].toIntOrNull() ?: -1
+                val minute = timeMatch.groupValues[2].toIntOrNull() ?: 0
+                if (hour in 0..23) {
+                    val isPm = containsAny(norm, "raat", "shaam", "evening", "night")
+                    val isDopahar = norm.contains("dopahar") || norm.contains("afternoon")
+                    if ((isPm || isDopahar) && hour < 12) hour += 12
+                    return Command.SetAlarm(hour, minute)
+                }
+            }
+            return Command.SetAlarm(-1, -1)
+        }
+
+        if (norm.contains("note")) {
+            if (containsAny(norm, "padho", "sunao", "read", "batao")) {
+                return Command.ReadNotes
+            }
+            val verbMatch = Regex("(likho|save karo|banao|add karo)\\s+(.+)").find(norm)
+            if (verbMatch != null) {
+                val noteText = verbMatch.groupValues[2].trim()
+                if (noteText.isNotBlank()) return Command.SaveNote(noteText)
+            }
+        }
+
+        if (containsAny(norm, "gaana", "song", "music") && containsAny(norm, "chalao", "play", "bajao")) {
+            var query = norm
+            listOf("gaana", "song", "music", "chalao", "play", "bajao", "karo")
+                .forEach { query = query.replace(it, " ") }
+            query = query.replace(Regex("\\s+"), " ").trim()
+            if (query.isNotBlank()) return Command.PlaySong(query)
+        }
+
         if (norm.contains("search")) {
             var query = norm
             listOf("google pe search karo", "google search", "search karo", "search kar do", "search for", "search")
@@ -66,7 +114,7 @@ object VoiceCommandProcessor {
             if (name.isNotBlank()) return Command.CallContact(name)
         }
 
-        if (containsAny(norm, "message", "msg", "bolo", "likho") && !norm.contains("whatsapp")) {
+        if (containsAny(norm, "message", "msg", "bolo", "likho") && !norm.contains("whatsapp") && !norm.contains("note")) {
             Regex("^message\\s+(\\w+)\\s+(.+)$").find(norm)?.let {
                 return Command.SendMessage(it.groupValues[1], it.groupValues[2])
             }
