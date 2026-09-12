@@ -21,6 +21,10 @@ import androidx.core.app.NotificationCompat
 import java.util.Locale
 import java.util.UUID
 
+/**
+ * Runs in the background and listens continuously. Only reacts once it hears
+ * the wake word "Jarvis" so it doesn't fire on every random sound.
+ */
 class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     companion object {
@@ -38,6 +42,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     private var isSpeaking = false
     private var isServiceActive = false
+    private var isAwaitingCommand = false
 
     override fun onCreate() {
         super.onCreate()
@@ -91,6 +96,10 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+            // Give more pause tolerance so "Jarvis... (pause) ...command" isn't cut short
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
         }
         try {
             speechRecognizer.startListening(intent)
@@ -109,20 +118,40 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
 
+            // If we just said "Ji bolo", treat whatever comes next as the
+            // command directly — no need to say "Jarvis" again.
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+                if (heard.isBlank()) {
+                    scheduleRestart()
+                } else {
+                    updateNotification("Suna: $heard")
+                    commandExecutor.execute(heard)
+                }
+                return
+            }
+
             val commandAfterWakeWord = WakeWordDetector.stripWakeWord(heard)
             if (commandAfterWakeWord != null) {
                 updateNotification("Suna: $heard")
                 if (commandAfterWakeWord.isBlank()) {
+                    isAwaitingCommand = true
                     speak("Ji bolo")
                 } else {
                     commandExecutor.execute(commandAfterWakeWord)
                 }
             } else {
+                // No wake word heard — keep listening silently, don't react.
                 scheduleRestart()
             }
         }
 
         override fun onError(error: Int) {
+            // ERROR_NO_MATCH / ERROR_SPEECH_TIMEOUT happen constantly in always-on
+            // mode (silence between sentences) — just restart quietly.
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+            }
             scheduleRestart()
         }
 
@@ -139,6 +168,8 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         updateNotification(text)
         val utteranceId = UUID.randomUUID().toString()
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        // onStart/onDone of the utterance listener pause/resume listening
+        // so Jarvis doesn't hear itself talking.
     }
 
     private fun stopListeningAndSelf() {
