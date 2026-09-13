@@ -35,7 +35,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+<activity
+            android:name=".ListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Jarvis" />
 
+        <service
+            android:name=".JarvisListenerService"
         <service
             android:name=".JarvisListenerService"
             android:exported="false"
