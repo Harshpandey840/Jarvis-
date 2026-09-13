@@ -24,7 +24,7 @@ object AiCommandParser {
     private const val MODEL = "gemini-3.6-flash"
     private val history = mutableListOf<Pair<String, String>>()
 
-    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, weather, news, translation, calculation, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name or contact name or empty\", \"text\": \"message text, search query, todo item, clipboard text, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related}. Use set_reminder when the user asks to be reminded of something at a specific time (e.g. \"kal 8 baje yaad dilana\") — put the reminder content in text, and compute correct hour/minute/day_offset from the current date and time given to you. For weather, news, translation, calculation, or any factual question, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences) — actually answer, do not refuse. If truly unsure, say so briefly. Output only the JSON object."
+    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, weather, news, translation, calculation, unit conversion, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, share_notes, share_todos, create_contact, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name, contact name, or empty\", \"text\": \"message text, search query, todo item, clipboard text, phone number digits for create_contact, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related, \"recurring\": true if the user wants a reminder repeated every day, otherwise false}. Use set_reminder when the user asks to be reminded of something at a specific time (e.g. \"kal 8 baje yaad dilana\" or \"roz subah 7 baje yaad dilana\") — put the reminder content in text, compute correct hour/minute/day_offset from the current date and time given to you, and set recurring true only if they said daily/roz/hamesha. For create_contact put the contact name in target and phone digits in text. For weather, news, translation, calculation, or unit conversion, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences) — actually answer, do not refuse. Output only the JSON object."
 
     fun parse(spokenText: String, apiKey: String, onResult: (Command) -> Unit) {
         if (apiKey.isBlank()) {
@@ -54,7 +54,7 @@ object AiCommandParser {
                     .post(body)
                     .build()
 
-                    client.newCall(request).execute().use { response ->
+                client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()
                     val root = JSONObject(responseText)
 
@@ -102,6 +102,7 @@ object AiCommandParser {
         val hour = json.optInt("hour", -1)
         val minute = json.optInt("minute", -1)
         val dayOffset = json.optInt("day_offset", 0)
+        val recurring = json.optBoolean("recurring", false)
 
         return when (action) {
             "open_app" -> Command.OpenApp(target)
@@ -111,13 +112,16 @@ object AiCommandParser {
             "search" -> Command.GoogleSearch(text.ifBlank { target })
             "play_song" -> Command.PlaySong(text.ifBlank { target })
             "set_alarm" -> Command.SetAlarm(hour, minute)
-            "set_reminder" -> Command.SetReminder(dayOffset.coerceAtLeast(0), hour, minute, text.ifBlank { target })
+            "set_reminder" -> Command.SetReminder(dayOffset.coerceAtLeast(0), hour, minute, text.ifBlank { target }, recurring)
             "add_todo" -> Command.AddTodo(text.ifBlank { target })
             "read_todos" -> Command.ReadTodos
             "read_clipboard" -> Command.ReadClipboard
             "write_clipboard" -> Command.WriteClipboard(text.ifBlank { target })
             "save_note" -> Command.SaveNote(text.ifBlank { target })
             "read_notes" -> Command.ReadNotes
+            "share_notes" -> Command.ShareNotes
+            "share_todos" -> Command.ShareTodos
+            "create_contact" -> Command.CreateContact(target, text)
             "tell_time" -> Command.TellTime
             "tell_battery" -> Command.TellBattery
             "volume_up" -> Command.VolumeUp
