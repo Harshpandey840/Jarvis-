@@ -20,6 +20,10 @@ object VoiceCommandProcessor {
         val norm = normalize(rawInput)
         if (norm.isBlank()) return Command.Unknown(rawInput)
 
+        if (norm.contains("lock")) {
+            return Command.LockPhone
+        }
+
         if (norm.contains("time") && containsAny(norm, "kya", "batao", "kitna baja")) {
             return Command.TellTime
         }
@@ -34,8 +38,8 @@ object VoiceCommandProcessor {
         }
 
         if (containsAny(norm, "torch", "flashlight", "flash light") || norm.contains("light")) {
+            if (containsAny(norm, "bandh", "band", "off karo", " off", "close", "shut")) return Command.FlashlightOff
             if (containsAny(norm, "jalao", "on karo", " on")) return Command.FlashlightOn
-            if (containsAny(norm, "bandh", "off karo", " off")) return Command.FlashlightOff
         }
 
         if (norm.contains("wifi")) {
@@ -53,7 +57,7 @@ object VoiceCommandProcessor {
         }
 
         if (norm.contains("alarm")) {
-            val timeMatch = Regex("(\\d{1,2})(?::(\\d{2}))?").find(norm)
+            val timeMatch = Regex("(\\d{1,2})(?:\\s(\\d{2}))?").find(norm)
             if (timeMatch != null) {
                 var hour = timeMatch.groupValues[1].toIntOrNull() ?: -1
                 val minute = timeMatch.groupValues[2].toIntOrNull() ?: 0
@@ -64,7 +68,8 @@ object VoiceCommandProcessor {
                     return Command.SetAlarm(hour, minute)
                 }
             }
-            return Command.SetAlarm(-1, -1)
+            // Koi digit nahi mila (jaise "saat baje" words mein bola) — AI ko samjhne dena
+            return Command.Unknown(rawInput)
         }
 
         if (norm.contains("note")) {
