@@ -30,7 +30,18 @@ class CommandExecutor(
         context.getSharedPreferences("jarvis_notes", Context.MODE_PRIVATE)
 
     fun execute(spokenText: String) {
-        when (val command = VoiceCommandProcessor.parse(spokenText)) {
+        val localCommand = VoiceCommandProcessor.parse(spokenText)
+        if (localCommand !is Command.Unknown) {
+            runCommand(localCommand)
+        } else {
+            AiCommandParser.parse(spokenText, BuildConfig.GEMINI_API_KEY) { aiCommand ->
+                runCommand(aiCommand)
+            }
+        }
+    }
+
+    private fun runCommand(command: Command) {
+        when (command) {
             is Command.OpenApp -> {
                 val opened = appLauncher.openApp(command.appName)
                 onSpeak(if (opened) "${command.appName} khol raha hoon" else "${command.appName} nahi mila")
@@ -180,15 +191,9 @@ class CommandExecutor(
                 context.startActivity(intent)
                 onSpeak("Bluetooth settings khol raha hoon")
             }
-            Command.SilentModeOn -> {
-                setRingerMode(AudioManager.RINGER_MODE_SILENT, "Silent kar diya")
-            }
-            Command.SilentModeOff -> {
-                setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
-            }
-            is Command.Unknown -> {
-                onSpeak("Samajh nahi aaya")
-            }
+            Command.SilentModeOn -> setRingerMode(AudioManager.RINGER_MODE_SILENT, "Silent kar diya")
+            Command.SilentModeOff -> setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
+            is Command.Unknown -> onSpeak("Samajh nahi aaya")
         }
     }
 
@@ -217,9 +222,7 @@ class CommandExecutor(
             if (cameraId != null) {
                 cameraManager.setTorchMode(cameraId, on)
             }
-        } catch (e: Exception) {
-            // some devices don't support this cleanly — ignore
-        }
+        } catch (e: Exception) { }
     }
 
     private fun normalizeForWhatsApp(rawNumber: String): String {
