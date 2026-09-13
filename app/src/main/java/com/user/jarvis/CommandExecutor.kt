@@ -2,6 +2,8 @@ package com.user.jarvis
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -88,14 +90,14 @@ class CommandExecutor(
                     return
                 }
                 val cleanNumber = normalizeForWhatsApp(number)
-                val encodedText = URLEncoder.encode(command.text, "UTF-8")
+                val encodedText = URLEncoder.encode(command.text, "UTF-8").replace("+", "%20")
                 try {
                     val intent = Intent(
                         Intent.ACTION_VIEW,
                         Uri.parse("https://wa.me/$cleanNumber?text=$encodedText")
                     ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
                     context.startActivity(intent)
-                    onSpeak("${command.contactName} ke WhatsApp mein message tayyar hai, send dabana")
+                    onSpeak("${command.contactName} ke WhatsApp mein message tayyar hai, Send dabana — WhatsApp khud automatic bhejne nahi deta")
                 } catch (e: Exception) {
                     onSpeak("WhatsApp nahi khul paya")
                 }
@@ -122,7 +124,7 @@ class CommandExecutor(
                 val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
                     if (command.hour in 0..23) {
                         putExtra(AlarmClock.EXTRA_HOUR, command.hour)
-                        putExtra(AlarmClock.EXTRA_MINUTES, command.minute)
+                        putExtra(AlarmClock.EXTRA_MINUTES, command.minute.coerceIn(0, 59))
                     }
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -141,6 +143,28 @@ class CommandExecutor(
                 existing.add(command.text)
                 prefs.edit().putStringSet("notes", existing).apply()
                 onSpeak("Note save kar diya")
+            }
+            is Command.ChatReply -> {
+                onSpeak(command.text)
+            }
+            Command.LockPhone -> {
+                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+                val adminComponent = ComponentName(context, JarvisDeviceAdminReceiver::class.java)
+                if (dpm.isAdminActive(adminComponent)) {
+                    onSpeak("Lock kar raha hoon")
+                    dpm.lockNow()
+                } else {
+                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                        putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "Jarvis ko phone lock karne ke liye ye ek-baar wali permission chahiye"
+                        )
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    onSpeak("Pehle lock permission allow karo, ek baar hi dena hoga")
+                }
             }
             Command.ReadNotes -> {
                 val notes = prefs.getStringSet("notes", setOf())?.toList() ?: listOf()
