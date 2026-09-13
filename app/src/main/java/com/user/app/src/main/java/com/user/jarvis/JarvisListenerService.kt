@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.Context
+import android.os.PowerManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -43,7 +45,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
     private var isSpeaking = false
     private var isServiceActive = false
     private var isAwaitingCommand = false
-
+private var wakeLock: PowerManager.WakeLock? = null
     override fun onCreate() {
         super.onCreate()
         tts = TextToSpeech(this, this)
@@ -65,6 +67,9 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jarvis::ListenerWakeLock")
+        wakeLock?.acquire(10 * 60 * 60 * 1000L)
         isServiceActive = true
         startListeningCycle()
         return START_STICKY
@@ -173,7 +178,9 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun stopListeningAndSelf() {
+        wakeLock?.let { if (it.isHeld) it.release() }
         isServiceActive = false
+        wakeLock?.let { if (it.isHeld) it.release() }
         handler.removeCallbacksAndMessages(null)
         speechRecognizer.stopListening()
         stopForeground(STOP_FOREGROUND_REMOVE)
