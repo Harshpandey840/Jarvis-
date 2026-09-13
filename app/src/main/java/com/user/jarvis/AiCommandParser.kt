@@ -8,6 +8,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object AiCommandParser {
@@ -19,17 +22,24 @@ object AiCommandParser {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private const val MODEL = "gemini-2.5-flash"
+    private val history = mutableListOf<Pair<String, String>>()
 
-    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). First decide: is this a DEVICE COMMAND (open app, call, message, alarm, etc) or just GENERAL TALK (a question, greeting, or chit-chat)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, save_note, read_notes, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name or contact name or empty\", \"text\": \"message text, search query, or your natural short spoken reply if action is chat\", \"hour\": alarm hour 0-23 or -1, \"minute\": alarm minute 0-59 or -1}. If it is general talk, a question, or anything that is not clearly one of the device actions, use action \"chat\" and put a short, warm, natural Hinglish reply (like a helpful friend would say, 1-3 sentences, no markdown) in the text field — actually answer their question or respond to what they said. Output only the JSON object."
+    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, weather, news, translation, calculation, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name or contact name or empty\", \"text\": \"message text, search query, todo item, clipboard text, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related}. Use set_reminder when the user asks to be reminded of something at a specific time (e.g. \"kal 8 baje yaad dilana\") — put the reminder content in text, and compute correct hour/minute/day_offset from the current date and time given to you. For weather, news, translation, calculation, or any factual question, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences) — actually answer, do not refuse. If truly unsure, say so briefly. Output only the JSON object."
 
     fun parse(spokenText: String, apiKey: String, onResult: (Command) -> Unit) {
         if (apiKey.isBlank()) {
-            onResult(Command.ChatReply("AI abhi setup nahi hai, API key check karo"))
+            onResult(Command.ChatReply("API key khaali hai, secret check karo"))
             return
         }
         Thread {
             try {
-                val prompt = "$SYSTEM_PROMPT\n\nUser said: \"$spokenText\""
+                val nowStr = SimpleDateFormat("EEEE, dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date())
+                val historyText = if (history.isNotEmpty()) {
+                    "Recent conversation:\n" + history.joinToString("\n") { "User: ${it.first}\nJarvis: ${it.second}" } + "\n\n"
+                } else ""
+                val prompt = "$SYSTEM_PROMPT\n\nCurrent date and time: $nowStr.\n\n$historyText" +
+                    "User said: \"$spokenText\""
+
                 val requestJson = JSONObject().apply {
                     put("contents", JSONArray().put(
                         JSONObject().apply {
@@ -61,9 +71,16 @@ object AiCommandParser {
                     mainHandler.post { onResult(command) }
                 }
             } catch (e: Exception) {
-                mainHandler.post { onResult(Command.ChatReply("Network mein dikkat aa rahi hai")) }
+                mainHandler.post {
+                    onResult(Command.ChatReply("Error: ${e.javaClass.simpleName} — ${e.message}"))
+                }
             }
         }.start()
+    }
+
+    private fun pushHistory(userText: String, replyText: String) {
+        history.add(userText to replyText)
+        while (history.size > 6) history.removeAt(0)
     }
 
     private fun mapToCommand(json: JSONObject, fallbackRaw: String): Command {
@@ -72,6 +89,7 @@ object AiCommandParser {
         val text = json.optString("text", "")
         val hour = json.optInt("hour", -1)
         val minute = json.optInt("minute", -1)
+        val dayOffset = json.optInt("day_offset", 0)
 
         return when (action) {
             "open_app" -> Command.OpenApp(target)
@@ -81,6 +99,11 @@ object AiCommandParser {
             "search" -> Command.GoogleSearch(text.ifBlank { target })
             "play_song" -> Command.PlaySong(text.ifBlank { target })
             "set_alarm" -> Command.SetAlarm(hour, minute)
+            "set_reminder" -> Command.SetReminder(dayOffset.coerceAtLeast(0), hour, minute, text.ifBlank { target })
+            "add_todo" -> Command.AddTodo(text.ifBlank { target })
+            "read_todos" -> Command.ReadTodos
+            "read_clipboard" -> Command.ReadClipboard
+            "write_clipboard" -> Command.WriteClipboard(text.ifBlank { target })
             "save_note" -> Command.SaveNote(text.ifBlank { target })
             "read_notes" -> Command.ReadNotes
             "tell_time" -> Command.TellTime
@@ -94,7 +117,11 @@ object AiCommandParser {
             "silent_on" -> Command.SilentModeOn
             "silent_off" -> Command.SilentModeOff
             "lock_phone" -> Command.LockPhone
-            "chat" -> Command.ChatReply(text.ifBlank { "Haan bolo" })
+            "chat" -> {
+                val reply = text.ifBlank { "Haan bolo" }
+                pushHistory(fallbackRaw, reply)
+                Command.ChatReply(reply)
+            }
             else -> Command.ChatReply(text.ifBlank { "Samajh nahi paya" })
         }
     }
