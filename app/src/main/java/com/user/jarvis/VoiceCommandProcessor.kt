@@ -26,6 +26,22 @@ object VoiceCommandProcessor {
 
         if (norm.contains("battery")) return Command.TellBattery
 
+        if (norm.contains("share") && norm.contains("note")) return Command.ShareNotes
+        if (norm.contains("share") && norm.contains("todo")) return Command.ShareTodos
+
+        if (containsAny(norm, "contact banao", "naya contact", "add contact")) {
+            val digitsMatch = Regex("\\b\\d{8,13}\\b").find(norm)
+            if (digitsMatch != null) {
+                val phone = digitsMatch.value
+                val namePart = norm.substring(0, digitsMatch.range.first)
+                val name = stripFillerWords(
+                    namePart,
+                    setOf("contact", "banao", "naya", "add", "number", "no", "ka", "ke", "liye", "name")
+                )
+                if (name.isNotBlank()) return Command.CreateContact(name, phone)
+            }
+        }
+
         if (norm.contains("volume")) {
             if (containsAny(norm, "badhao", "badha do", "increase", "tez", " up")) return Command.VolumeUp
             if (containsAny(norm, "kam karo", "ghatao", "decrease", " down", "kam kar")) return Command.VolumeDown
