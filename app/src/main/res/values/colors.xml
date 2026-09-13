@@ -6,5 +6,7 @@
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#8B98A5</color>
     <color name="surface_card">#161C24</color>
-    <color name="stop_red">#FF5252</color>
+<color name="stop_red">#FF5252</color>
+    <color name="accent_online_green">#00E676</color>
+    <color name="accent_offline_gray">#5A6672</color>
 </resources>
