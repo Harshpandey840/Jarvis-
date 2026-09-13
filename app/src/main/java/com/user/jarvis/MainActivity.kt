@@ -1,11 +1,14 @@
 package com.user.jarvis
 
 import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +19,8 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.text.InputType
+import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -28,8 +33,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var tts: TextToSpeech
-    private lateinit var statusText: TextView
-    private lateinit var micButton: Button
+    private lateinit var stateLabel: TextView
+    private lateinit var youSaidText: TextView
+    private lateinit var jarvisReplyText: TextView
+    private lateinit var statusDot: View
+    private lateinit var statusLabel: TextView
+    private lateinit var micButton: View
     private lateinit var jarvisToggleButton: Button
 
     private lateinit var commandExecutor: CommandExecutor
@@ -52,9 +61,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        statusText = findViewById(R.id.statusText)
+        stateLabel = findViewById(R.id.stateLabel)
+        youSaidText = findViewById(R.id.youSaidText)
+        jarvisReplyText = findViewById(R.id.jarvisReplyText)
+        statusDot = findViewById(R.id.statusDot)
+        statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
+
+        statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
 
         commandExecutor = CommandExecutor(this) { speak(it) }
 
@@ -67,7 +82,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         micButton.setOnClickListener { startListening() }
         jarvisToggleButton.setOnClickListener { toggleJarvisService() }
 
+        setupPulseAnimation()
         lockUiUntilPinVerified()
+    }
+
+    private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
+
+    // ---------- Orb pulse animation ----------
+
+    private fun setupPulseAnimation() {
+        pulseView(findViewById(R.id.pulseRingOuter), 0L)
+        pulseView(findViewById(R.id.pulseRingInner), 800L)
+    }
+
+    private fun pulseView(view: View, delay: Long) {
+        view.alpha = 0f
+        val scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.7f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.7f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.55f, 0f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        AnimatorSet().apply {
+            playTogether(scaleX, scaleY, alpha)
+            duration = 1700
+            startDelay = delay
+            interpolator = LinearInterpolator()
+            start()
+        }
     }
 
     // ---------- PIN lock ----------
@@ -77,11 +122,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         jarvisToggleButton.isEnabled = false
         val securityPrefs = getSharedPreferences("jarvis_security", Context.MODE_PRIVATE)
         val savedPin = securityPrefs.getString("pin", null)
-        if (savedPin == null) {
-            promptSetPin(securityPrefs)
-        } else {
-            promptEnterPin(savedPin)
-        }
+        if (savedPin == null) promptSetPin(securityPrefs) else promptEnterPin(savedPin)
     }
 
     private fun promptSetPin(prefs: SharedPreferences) {
@@ -119,9 +160,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .setView(input)
             .setCancelable(false)
             .setPositiveButton("Unlock") { _, _ ->
-                if (input.text.toString() == savedPin) {
-                    unlockUi()
-                } else {
+                if (input.text.toString() == savedPin) unlockUi()
+                else {
                     Toast.makeText(this, "Galat PIN", Toast.LENGTH_SHORT).show()
                     promptEnterPin(savedPin)
                 }
@@ -151,7 +191,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
         }
-        statusText.text = "Sun raha hoon..."
+        stateLabel.text = "Sun raha hoon..."
         speechRecognizer.startListening(intent)
     }
 
@@ -159,10 +199,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val spokenText = matches?.firstOrNull().orEmpty()
-            statusText.text = "Suna: $spokenText"
-            if (spokenText.isNotBlank()) commandExecutor.execute(spokenText)
+            if (spokenText.isNotBlank()) {
+                youSaidText.text = spokenText
+                stateLabel.text = "Soch raha hoon..."
+                commandExecutor.execute(spokenText)
+            } else {
+                stateLabel.text = "Mic dabao aur bolo"
+            }
         }
-        override fun onError(error: Int) { statusText.text = "Samajh nahi aaya, phir se try karein" }
+        override fun onError(error: Int) { stateLabel.text = "Samajh nahi aaya, phir bolo" }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {}
@@ -184,15 +229,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
             startService(stopIntent)
             isJarvisRunning = false
-            jarvisToggleButton.text = "Start Jarvis (Always On)"
-            statusText.text = "Jarvis band ho gaya"
+            jarvisToggleButton.text = "  START JARVIS · ALWAYS ON"
+            statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
+            statusLabel.text = "STANDBY"
         } else {
             requestBatteryOptimizationExemption()
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
             isJarvisRunning = true
-            jarvisToggleButton.text = "Stop Jarvis"
-            statusText.text = "Jarvis background mein sun raha hai — bolo \"Jarvis\" phir command"
+            jarvisToggleButton.text = "  STOP JARVIS"
+            statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
+            statusLabel.text = "ALWAYS ON"
         }
     }
 
@@ -207,7 +254,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun speak(text: String) {
-        statusText.text = text
+        jarvisReplyText.text = text
+        stateLabel.text = "Mic dabao aur bolo"
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
