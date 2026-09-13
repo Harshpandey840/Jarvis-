@@ -18,6 +18,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.provider.AlarmClock
+import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import java.net.URLEncoder
@@ -133,18 +134,12 @@ class CommandExecutor(
                 if (calendar.timeInMillis <= System.currentTimeMillis()) {
                     calendar.add(Calendar.DAY_OF_YEAR, 1)
                 }
-                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                val reminderIntent = Intent(context, ReminderReceiver::class.java).apply {
-                    putExtra("reminder_text", command.text)
-                }
-                val requestCode = System.currentTimeMillis().toInt()
-                val pendingIntent = PendingIntent.getBroadcast(
-                    context, requestCode, reminderIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+                scheduleReminder(calendar.timeInMillis, command.text, command.hour, command.minute, command.isRecurring)
                 val timeStr = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(calendar.time)
-                onSpeak("Theek hai, $timeStr ko yaad dila dunga")
+                onSpeak(
+                    if (command.isRecurring) "Theek hai, har roz $timeStr ke time yaad dilaunga"
+                    else "Theek hai, $timeStr ko yaad dila dunga"
+                )
             }
             is Command.SaveNote -> {
                 val existing = prefs.getStringSet("notes", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
@@ -162,6 +157,14 @@ class CommandExecutor(
                 val todos = prefs.getStringSet("todos", setOf())?.toList() ?: listOf()
                 onSpeak(if (todos.isEmpty()) "Todo list khaali hai" else "Tumhari todo list: " + todos.joinToString(". "))
             }
+            Command.ShareNotes -> {
+                val notes = prefs.getStringSet("notes", setOf())?.toList() ?: listOf()
+                shareText("Mere Notes:\n" + notes.joinToString("\n"))
+            }
+            Command.ShareTodos -> {
+                val todos = prefs.getStringSet("todos", setOf())?.toList() ?: listOf()
+                shareText("Meri Todo List:\n" + todos.joinToString("\n"))
+            }
             Command.ReadClipboard -> {
                 val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = clipboardManager.primaryClip
@@ -176,6 +179,20 @@ class CommandExecutor(
                 val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 clipboardManager.setPrimaryClip(ClipData.newPlainText("Jarvis", command.text))
                 onSpeak("Clipboard mein copy kar diya")
+            }
+            is Command.CreateContact -> {
+                try {
+                    val intent = Intent(Intent.ACTION_INSERT).apply {
+                        type = ContactsContract.Contacts.CONTENT_TYPE
+                        putExtra(ContactsContract.Intents.Insert.NAME, command.name)
+                        putExtra(ContactsContract.Intents.Insert.PHONE, command.phone)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    onSpeak("${command.name} ka contact tayyar kar diya, Save dabana")
+                } catch (e: Exception) {
+                    onSpeak("Contact nahi bana paya")
+                }
             }
             is Command.ChatReply -> onSpeak(command.text)
             Command.LockPhone -> {
@@ -230,6 +247,38 @@ class CommandExecutor(
             Command.SilentModeOn -> setRingerMode(AudioManager.RINGER_MODE_SILENT, "Silent kar diya")
             Command.SilentModeOff -> setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
             is Command.Unknown -> onSpeak("Samajh nahi aaya")
+        }
+    }
+
+    private fun scheduleReminder(triggerAtMillis: Long, text: String, hour: Int, minute: Int, isRecurring: Boolean) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val reminderIntent = Intent(context, ReminderReceiver::class.java).apply {
+            putExtra("reminder_text", text)
+            putExtra("is_recurring", isRecurring)
+            putExtra("reminder_hour", hour)
+            putExtra("reminder_minute", minute)
+        }
+        val requestCode = System.currentTimeMillis().toInt()
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, requestCode, reminderIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+    }
+
+    private fun shareText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(Intent.createChooser(intent, "Share karo").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            onSpeak("Share karne ka option khol raha hoon")
+        } catch (e: Exception) {
+            onSpeak("Share nahi kar paya")
         }
     }
 
