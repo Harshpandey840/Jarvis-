@@ -54,9 +54,21 @@ object AiCommandParser {
                     .post(body)
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                    client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()
                     val root = JSONObject(responseText)
+
+                    if (root.has("error")) {
+                        val message = root.getJSONObject("error").optString("message", "Unknown error")
+                        mainHandler.post { onResult(Command.ChatReply("API error: $message")) }
+                        return@use
+                    }
+                    if (!root.has("candidates")) {
+                        val blockReason = root.optJSONObject("promptFeedback")?.optString("blockReason", "no reason")
+                        mainHandler.post { onResult(Command.ChatReply("AI ne jawab nahi diya: ${blockReason ?: "unknown"}")) }
+                        return@use
+                    }
+
                     val rawText = root.getJSONArray("candidates")
                         .getJSONObject(0)
                         .getJSONObject("content")
