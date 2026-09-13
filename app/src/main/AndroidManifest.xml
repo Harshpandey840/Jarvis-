@@ -40,7 +40,9 @@
             android:name=".JarvisListenerService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
-
+<receiver
+            android:name=".ReminderReceiver"
+            android:exported="false" />
         <receiver
             android:name=".JarvisDeviceAdminReceiver"
             android:permission="android.permission.BIND_DEVICE_ADMIN"
