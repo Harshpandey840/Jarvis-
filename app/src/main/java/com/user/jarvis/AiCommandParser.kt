@@ -20,11 +20,11 @@ object AiCommandParser {
     private val mainHandler = Handler(Looper.getMainLooper())
     private const val MODEL = "gemini-2.5-flash"
 
-    private const val SYSTEM_PROMPT = "You are a strict command parser for a personal Android voice assistant called Jarvis. The user speaks Hindi/English mixed (Hinglish). Convert their spoken phrase into ONE JSON object ONLY, no explanation, no markdown fences, just raw JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, save_note, read_notes, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, unknown\", \"target\": \"app name or contact name or empty\", \"text\": \"message text or search query or empty\", \"hour\": alarm hour 0-23 or -1, \"minute\": alarm minute or -1}. Output only the JSON object."
+    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). First decide: is this a DEVICE COMMAND (open app, call, message, alarm, etc) or just GENERAL TALK (a question, greeting, or chit-chat)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, save_note, read_notes, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name or contact name or empty\", \"text\": \"message text, search query, or your natural short spoken reply if action is chat\", \"hour\": alarm hour 0-23 or -1, \"minute\": alarm minute 0-59 or -1}. If it is general talk, a question, or anything that is not clearly one of the device actions, use action \"chat\" and put a short, warm, natural Hinglish reply (like a helpful friend would say, 1-3 sentences, no markdown) in the text field — actually answer their question or respond to what they said. Output only the JSON object."
 
     fun parse(spokenText: String, apiKey: String, onResult: (Command) -> Unit) {
         if (apiKey.isBlank()) {
-            onResult(Command.Unknown(spokenText))
+            onResult(Command.ChatReply("AI abhi setup nahi hai, API key check karo"))
             return
         }
         Thread {
@@ -61,13 +61,13 @@ object AiCommandParser {
                     mainHandler.post { onResult(command) }
                 }
             } catch (e: Exception) {
-                mainHandler.post { onResult(Command.Unknown(spokenText)) }
+                mainHandler.post { onResult(Command.ChatReply("Network mein dikkat aa rahi hai")) }
             }
         }.start()
     }
 
     private fun mapToCommand(json: JSONObject, fallbackRaw: String): Command {
-        val action = json.optString("action", "unknown")
+        val action = json.optString("action", "chat")
         val target = json.optString("target", "")
         val text = json.optString("text", "")
         val hour = json.optInt("hour", -1)
@@ -93,7 +93,9 @@ object AiCommandParser {
             "bluetooth_settings" -> Command.OpenBluetoothSettings
             "silent_on" -> Command.SilentModeOn
             "silent_off" -> Command.SilentModeOff
-            else -> Command.Unknown(fallbackRaw)
+            "lock_phone" -> Command.LockPhone
+            "chat" -> Command.ChatReply(text.ifBlank { "Haan bolo" })
+            else -> Command.ChatReply(text.ifBlank { "Samajh nahi paya" })
         }
     }
 }
