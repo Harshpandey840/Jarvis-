@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
     private lateinit var voiceSettingsButton: TextView
+    private lateinit var notesListButton: TextView
     private lateinit var jarvisToggleButton: Button
 
     private lateinit var commandExecutor: CommandExecutor
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
         voiceSettingsButton = findViewById(R.id.voiceSettingsButton)
+        notesListButton = findViewById(R.id.notesListButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
@@ -84,6 +86,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         micButton.setOnClickListener { startListening() }
         jarvisToggleButton.setOnClickListener { toggleJarvisService() }
         voiceSettingsButton.setOnClickListener { showVoicePicker() }
+        notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
