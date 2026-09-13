@@ -20,17 +20,11 @@ object VoiceCommandProcessor {
         val norm = normalize(rawInput)
         if (norm.isBlank()) return Command.Unknown(rawInput)
 
-        if (norm.contains("lock")) {
-            return Command.LockPhone
-        }
+        if (norm.contains("lock")) return Command.LockPhone
 
-        if (norm.contains("time") && containsAny(norm, "kya", "batao", "kitna baja")) {
-            return Command.TellTime
-        }
+        if (norm.contains("time") && containsAny(norm, "kya", "batao", "kitna baja")) return Command.TellTime
 
-        if (norm.contains("battery")) {
-            return Command.TellBattery
-        }
+        if (norm.contains("battery")) return Command.TellBattery
 
         if (norm.contains("volume")) {
             if (containsAny(norm, "badhao", "badha do", "increase", "tez", " up")) return Command.VolumeUp
@@ -42,19 +36,11 @@ object VoiceCommandProcessor {
             if (containsAny(norm, "jalao", "on karo", " on")) return Command.FlashlightOn
         }
 
-        if (norm.contains("wifi")) {
-            return Command.OpenWifiSettings
-        }
-        if (norm.contains("bluetooth")) {
-            return Command.OpenBluetoothSettings
-        }
+        if (norm.contains("wifi")) return Command.OpenWifiSettings
+        if (norm.contains("bluetooth")) return Command.OpenBluetoothSettings
 
-        if (containsAny(norm, "silent", "chup")) {
-            return Command.SilentModeOn
-        }
-        if (norm.contains("sound") && containsAny(norm, "on karo", "chalu karo", " on")) {
-            return Command.SilentModeOff
-        }
+        if (containsAny(norm, "silent", "chup")) return Command.SilentModeOn
+        if (norm.contains("sound") && containsAny(norm, "on karo", "chalu karo", " on")) return Command.SilentModeOff
 
         if (norm.contains("alarm")) {
             val timeMatch = Regex("(\\d{1,2})(?:\\s(\\d{2}))?").find(norm)
@@ -68,32 +54,44 @@ object VoiceCommandProcessor {
                     return Command.SetAlarm(hour, minute)
                 }
             }
-            // Koi digit nahi mila (jaise "saat baje" words mein bola) — AI ko samjhne dena
             return Command.Unknown(rawInput)
         }
 
-        if (norm.contains("note")) {
-            if (containsAny(norm, "padho", "sunao", "read", "batao")) {
-                return Command.ReadNotes
+        if (norm.contains("clipboard")) {
+            if (containsAny(norm, "padho", "kya hai", "read", "batao")) return Command.ReadClipboard
+            Regex("(likho|copy karo|save karo)\\s+(.+)").find(norm)?.let {
+                val clipText = it.groupValues[2].trim()
+                if (clipText.isNotBlank()) return Command.WriteClipboard(clipText)
             }
-            val verbMatch = Regex("(likho|save karo|banao|add karo)\\s+(.+)").find(norm)
-            if (verbMatch != null) {
-                val noteText = verbMatch.groupValues[2].trim()
+            return Command.ReadClipboard
+        }
+
+        if (norm.contains("todo")) {
+            if (containsAny(norm, "padho", "batao", "list", "read") && !containsAny(norm, "add", "likho")) {
+                return Command.ReadTodos
+            }
+            Regex("(add karo|likho|daalo)\\s+(.+)").find(norm)?.let {
+                val item = it.groupValues[2].trim()
+                if (item.isNotBlank()) return Command.AddTodo(item)
+            }
+            return Command.ReadTodos
+        }
+
+        if (norm.contains("note")) {
+            if (containsAny(norm, "padho", "sunao", "read", "batao")) return Command.ReadNotes
+            Regex("(likho|save karo|banao|add karo)\\s+(.+)").find(norm)?.let {
+                val noteText = it.groupValues[2].trim()
                 if (noteText.isNotBlank()) return Command.SaveNote(noteText)
             }
         }
 
         if (containsAny(norm, "gaana", "song", "music") && containsAny(norm, "chalao", "play", "bajao")) {
-            val query = stripFillerWords(
-                norm, setOf("gaana", "song", "music", "chalao", "play", "bajao", "karo")
-            )
+            val query = stripFillerWords(norm, setOf("gaana", "song", "music", "chalao", "play", "bajao", "karo"))
             if (query.isNotBlank()) return Command.PlaySong(query)
         }
 
         if (norm.contains("search")) {
-            val query = stripFillerWords(
-                norm, setOf("google", "pe", "search", "karo", "kar", "do", "for")
-            )
+            val query = stripFillerWords(norm, setOf("google", "pe", "search", "karo", "kar", "do", "for"))
             if (query.isNotBlank()) return Command.GoogleSearch(query)
         }
 
@@ -112,13 +110,13 @@ object VoiceCommandProcessor {
         }
 
         if (norm.contains("call")) {
-            val name = stripFillerWords(
-                norm, setOf("call", "karo", "kar", "do", "phone", "ko", "please", "kripya")
-            )
+            val name = stripFillerWords(norm, setOf("call", "karo", "kar", "do", "phone", "ko", "please", "kripya"))
             if (name.isNotBlank()) return Command.CallContact(name)
         }
 
-        if (containsAny(norm, "message", "msg", "bolo", "likho") && !norm.contains("whatsapp") && !norm.contains("note")) {
+        if (containsAny(norm, "message", "msg", "bolo", "likho") &&
+            !norm.contains("whatsapp") && !norm.contains("note") &&
+            !norm.contains("clipboard") && !norm.contains("todo")) {
             Regex("^message\\s+(\\w+)\\s+(.+)$").find(norm)?.let {
                 return Command.SendMessage(it.groupValues[1], it.groupValues[2])
             }
