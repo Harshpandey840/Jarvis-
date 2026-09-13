@@ -178,22 +178,42 @@
             android:layout_marginTop="3dp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/voiceSettingsButton"
+    <LinearLayout
+        android:id="@+id/secondaryButtonsRow"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🎚 Change Voice"
-        android:textColor="@color/accent_cyan_dim"
-        android:textSize="12sp"
-        android:padding="8dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?android:attr/selectableItemBackground"
+        android:orientation="horizontal"
         app:layout_constraintTop_toBottomOf="@id/transcriptCard"
         app:layout_constraintBottom_toTopOf="@id/jarvisToggleButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="14dp" />
+        android:layout_marginTop="14dp">
+
+        <TextView
+            android:id="@+id/voiceSettingsButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎚 Voice"
+            android:textColor="@color/accent_cyan_dim"
+            android:textSize="12sp"
+            android:padding="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground" />
+
+        <TextView
+            android:id="@+id/notesListButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📋 Notes &amp; Todos"
+            android:textColor="@color/accent_cyan_dim"
+            android:textSize="12sp"
+            android:padding="8dp"
+            android:layout_marginStart="20dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/jarvisToggleButton"
