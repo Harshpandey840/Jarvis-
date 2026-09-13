@@ -78,6 +78,7 @@ private var wakeLock: PowerManager.WakeLock? = null
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             tts.language = Locale("hi", "IN")
+            VoicePreferences.applySavedVoice(this, tts)
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     isSpeaking = true
