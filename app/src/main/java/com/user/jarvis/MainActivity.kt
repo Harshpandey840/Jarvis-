@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
+    private lateinit var voiceSettingsButton: TextView
     private lateinit var jarvisToggleButton: Button
 
     private lateinit var commandExecutor: CommandExecutor
@@ -67,6 +68,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         statusDot = findViewById(R.id.statusDot)
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
+        voiceSettingsButton = findViewById(R.id.voiceSettingsButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
@@ -81,12 +83,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         micButton.setOnClickListener { startListening() }
         jarvisToggleButton.setOnClickListener { toggleJarvisService() }
+        voiceSettingsButton.setOnClickListener { showVoicePicker() }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
     }
 
     private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
+
+    // ---------- Voice picker ----------
+
+    private fun showVoicePicker() {
+        val voices = VoicePreferences.getCandidateVoices(tts)
+        if (voices.isEmpty()) {
+            Toast.makeText(this, "Koi extra voice nahi mili is phone mein", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = voices.map { VoicePreferences.displayName(it) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Voice choose karo")
+            .setItems(names) { _, which ->
+                val chosen = voices[which]
+                tts.voice = chosen
+                VoicePreferences.saveVoiceName(this, chosen.name)
+                tts.speak("Namaste, main Jarvis hoon. Kaisi lagi ye awaaz?", TextToSpeech.QUEUE_FLUSH, null, null)
+            }
+            .setNegativeButton("Band karo", null)
+            .show()
+    }
 
     // ---------- Orb pulse animation ----------
 
@@ -177,7 +201,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     // ---------- Tap-to-speak ----------
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) tts.language = Locale("hi", "IN")
+        if (status == TextToSpeech.SUCCESS) {
+            tts.language = Locale("hi", "IN")
+            VoicePreferences.applySavedVoice(this, tts)
+        }
     }
 
     private fun startListening() {
