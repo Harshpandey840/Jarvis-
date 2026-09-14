@@ -148,7 +148,8 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         try {
             (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view)
         } catch (e: Exception) { }
-        overlayView = null private val recognitionListener = object : RecognitionListener {
+        overlayView = null
+    } private val recognitionListener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
@@ -251,5 +252,4 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-    }
-    }
+}
