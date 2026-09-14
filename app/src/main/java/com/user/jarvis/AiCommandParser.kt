@@ -24,7 +24,7 @@ object AiCommandParser {
     private const val MODEL = "gemini-3.6-flash"
     private val history = mutableListOf<Pair<String, String>>()
 
-    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, weather, news, translation, calculation, unit conversion, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, share_notes, share_todos, create_contact, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name, contact name, or empty\", \"text\": \"message text, search query, todo item, clipboard text, phone number digits for create_contact, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related, \"recurring\": true if the user wants a reminder repeated every day, otherwise false}. Use set_reminder when the user asks to be reminded of something at a specific time (e.g. \"kal 8 baje yaad dilana\" or \"roz subah 7 baje yaad dilana\") — put the reminder content in text, compute correct hour/minute/day_offset from the current date and time given to you, and set recurring true only if they said daily/roz/hamesha. For create_contact put the contact name in target and phone digits in text. For weather, news, translation, calculation, or unit conversion, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences) — actually answer, do not refuse. Output only the JSON object."
+    private const val SYSTEM_PROMPT = "You are Jarvis, a warm and helpful personal Android voice assistant. The user speaks Hindi/English mixed (Hinglish). You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, translation, calculation, unit conversion, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, share_notes, share_todos, create_contact, get_weather, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, chat\", \"target\": \"app name, contact name, or empty\", \"text\": \"message text, search query, todo item, clipboard text, phone number digits for create_contact, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related, \"recurring\": true if the user wants a reminder repeated every day, otherwise false}. Use set_reminder when the user asks to be reminded of something at a specific time — put the reminder content in text, compute correct hour/minute/day_offset from the current date and time given to you, and set recurring true only if they said daily/roz/hamesha. For create_contact put the contact name in target and phone digits in text. For get_weather, only use it if a live current weather lookup makes sense; for translation, calculation, or unit conversion, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences). Output only the JSON object."
 
     fun parse(spokenText: String, apiKey: String, onResult: (Command) -> Unit) {
         if (apiKey.isBlank()) {
@@ -90,6 +90,47 @@ object AiCommandParser {
         }.start()
     }
 
+    fun summarizeText(text: String, apiKey: String, onResult: (String) -> Unit) {
+        if (apiKey.isBlank()) {
+            onResult("API key khaali hai")
+            return
+        }
+        Thread {
+            try {
+                val truncated = if (text.length > 6000) text.substring(0, 6000) else text
+                val prompt = "Summarize this text in 3-4 short Hinglish spoken sentences, plain text only, no markdown:\n\n$truncated"
+                val requestJson = JSONObject().apply {
+                    put("contents", JSONArray().put(
+                        JSONObject().apply {
+                            put("parts", JSONArray().put(JSONObject().apply { put("text", prompt) }))
+                        }
+                    ))
+                }
+                val body = requestJson.toString().toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent")
+                    .addHeader("x-goog-api-key", apiKey)
+                    .post(body)
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    val responseText = response.body?.string().orEmpty()
+                    val root = JSONObject(responseText)
+                    if (root.has("error")) {
+                        val message = root.getJSONObject("error").optString("message", "Unknown error")
+                        mainHandler.post { onResult("API error: $message") }
+                        return@use
+                    }
+                    val rawText = root.getJSONArray("candidates")
+                        .getJSONObject(0).getJSONObject("content")
+                        .getJSONArray("parts").getJSONObject(0).getString("text")
+                    mainHandler.post { onResult(rawText.trim()) }
+                }
+            } catch (e: Exception) {
+                mainHandler.post { onResult("Error: ${e.javaClass.simpleName} — ${e.message}") }
+            }
+        }.start()
+    }
+
     private fun pushHistory(userText: String, replyText: String) {
         history.add(userText to replyText)
         while (history.size > 6) history.removeAt(0)
@@ -122,6 +163,7 @@ object AiCommandParser {
             "share_notes" -> Command.ShareNotes
             "share_todos" -> Command.ShareTodos
             "create_contact" -> Command.CreateContact(target, text)
+            "get_weather" -> Command.GetWeather
             "tell_time" -> Command.TellTime
             "tell_battery" -> Command.TellBattery
             "volume_up" -> Command.VolumeUp
