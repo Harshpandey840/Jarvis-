@@ -30,5 +30,6 @@ sealed class Command {
     object SilentModeOn : Command()
     object SilentModeOff : Command()
     object LockPhone : Command()
+    object GetWeather : Command()
     data class Unknown(val raw: String) : Command()
 }
