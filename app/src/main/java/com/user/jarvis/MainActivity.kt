@@ -263,6 +263,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
             statusLabel.text = "STANDBY"
         } else {
+            requestOverlayPermission()
             requestBatteryOptimizationExemption()
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
@@ -272,7 +273,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusLabel.text = "ALWAYS ON"
         }
     }
-
+private fun requestOverlayPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            try { startActivity(intent) } catch (e: Exception) { }
+        }
+}
     private fun requestBatteryOptimizationExemption() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
