@@ -22,6 +22,8 @@ object VoiceCommandProcessor {
 
         if (norm.contains("lock")) return Command.LockPhone
 
+        if (containsAny(norm, "mausam", "weather")) return Command.GetWeather
+
         if (norm.contains("time") && containsAny(norm, "kya", "batao", "kitna baja")) return Command.TellTime
 
         if (norm.contains("battery")) return Command.TellBattery
