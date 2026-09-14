@@ -148,6 +148,108 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         try {
             (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view)
         } catch (e: Exception) { }
-        overlayView = null
+        overlayView = null private val recognitionListener = object : RecognitionListener {
+        override fun onResults(results: Bundle?) {
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val heard = matches?.firstOrNull().orEmpty()
+
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+                if (heard.isBlank()) {
+                    scheduleRestart()
+                } else {
+                    updateNotification("Suna: $heard")
+                    commandExecutor.execute(heard)
+                }
+                return
+            }
+
+            val commandAfterWakeWord = WakeWordDetector.stripWakeWord(heard)
+            if (commandAfterWakeWord != null) {
+                updateNotification("Suna: $heard")
+                if (commandAfterWakeWord.isBlank()) {
+                    isAwaitingCommand = true
+                    speak("Ji bolo")
+                } else {
+                    commandExecutor.execute(commandAfterWakeWord)
+                }
+            } else {
+                scheduleRestart()
+            }
+        }
+
+        override fun onError(error: Int) {
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+            }
+            scheduleRestart()
+        }
+
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
     }
-}
+
+    private fun speak(text: String) {
+        updateNotification(text)
+        val utteranceId = UUID.randomUUID().toString()
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+    }
+
+    private fun stopListeningAndSelf() {
+        isServiceActive = false
+        handler.removeCallbacksAndMessages(null)
+        removeOverlay()
+        speechRecognizer.stopListening()
+        wakeLock?.let { if (it.isHeld) it.release() }
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun buildNotification(content: String): Notification {
+        val stopIntent = Intent(this, JarvisListenerService::class.java).apply { action = ACTION_STOP }
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Jarvis active hai")
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setOngoing(true)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Band karo", stopPendingIntent)
+            .build()
+    }
+
+    private fun updateNotification(content: String) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.notify(NOTIFICATION_ID, buildNotification(content))
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID, "Jarvis Listener", NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Jarvis background listening status"
+        }
+        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+    }
+
+    override fun onDestroy() {
+        isServiceActive = false
+        handler.removeCallbacksAndMessages(null)
+        removeOverlay()
+        speechRecognizer.destroy()
+        wakeLock?.let { if (it.isHeld) it.release() }
+        tts.stop()
+        tts.shutdown()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+    }
+    }
