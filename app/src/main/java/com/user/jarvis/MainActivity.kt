@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var micButton: View
     private lateinit var voiceSettingsButton: TextView
     private lateinit var notesListButton: TextView
+    private lateinit var fileSummaryButton: TextView
     private lateinit var jarvisToggleButton: Button
 
     private lateinit var commandExecutor: CommandExecutor
@@ -59,7 +60,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         Manifest.permission.SEND_SMS,
         Manifest.permission.READ_CONTACTS,
         Manifest.permission.CALL_PHONE,
-        Manifest.permission.CAMERA
+        Manifest.permission.CAMERA,
+        Manifest.permission.ACCESS_COARSE_LOCATION
     ).let {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) it + Manifest.permission.POST_NOTIFICATIONS else it
     }
@@ -67,6 +69,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val permissionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { }
+
+    private val fileSummaryLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) handleFileForSummary(uri) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +86,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         micButton = findViewById(R.id.micButton)
         voiceSettingsButton = findViewById(R.id.voiceSettingsButton)
         notesListButton = findViewById(R.id.notesListButton)
+        fileSummaryButton = findViewById(R.id.fileSummaryButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
@@ -96,12 +103,33 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         jarvisToggleButton.setOnClickListener { toggleJarvisService() }
         voiceSettingsButton.setOnClickListener { showVoicePicker() }
         notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
+        fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
     }
 
     private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
+
+    // ---------- File summarize ----------
+
+    private fun handleFileForSummary(uri: Uri) {
+        stateLabel.text = "File padh raha hoon..."
+        try {
+            val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (text.isBlank()) {
+                speak("Is file mein text nahi mila")
+                return
+            }
+            stateLabel.text = "Summarize kar raha hoon..."
+            AiCommandParser.summarizeText(text, BuildConfig.GEMINI_API_KEY) { summary ->
+                youSaidText.text = "[File summary]"
+                speak(summary)
+            }
+        } catch (e: Exception) {
+            speak("File nahi padh paya")
+        }
+    }
 
     // ---------- Voice picker ----------
 
