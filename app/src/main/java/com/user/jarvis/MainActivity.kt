@@ -4,6 +4,8 @@ import android.Manifest
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.app.AlertDialog
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -26,7 +28,12 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import java.io.File
 import java.util.Locale
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
@@ -45,12 +52,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var commandExecutor: CommandExecutor
     private var isJarvisRunning = false
+    private var wrongPinAttempts = 0
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.RECORD_AUDIO,
         Manifest.permission.SEND_SMS,
         Manifest.permission.READ_CONTACTS,
-        Manifest.permission.CALL_PHONE
+        Manifest.permission.CALL_PHONE,
+        Manifest.permission.CAMERA
     ).let {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) it + Manifest.permission.POST_NOTIFICATIONS else it
     }
@@ -142,7 +151,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // ---------- PIN lock ----------
+    // ---------- PIN lock + intruder security ----------
 
     private fun lockUiUntilPinVerified() {
         micButton.isEnabled = false
@@ -159,13 +168,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         AlertDialog.Builder(this)
             .setTitle("Jarvis PIN set karo")
-            .setMessage("Ye PIN app kholte waqt maangega")
+            .setMessage("Ye PIN app kholte waqt maangega. Agar koi 3 baar galat PIN daale, uska photo khinch ke phone lock ho jayega.")
             .setView(input)
             .setCancelable(false)
             .setPositiveButton("Set karo") { _, _ ->
                 val pin = input.text.toString()
                 if (pin.length in 4..6) {
                     prefs.edit().putString("pin", pin).apply()
+                    requestDeviceAdminIfNeeded()
                     unlockUi()
                 } else {
                     Toast.makeText(this, "4 se 6 digit ka PIN daalo", Toast.LENGTH_SHORT).show()
@@ -187,9 +197,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .setView(input)
             .setCancelable(false)
             .setPositiveButton("Unlock") { _, _ ->
-                if (input.text.toString() == savedPin) unlockUi()
-                else {
+                if (input.text.toString() == savedPin) {
+                    wrongPinAttempts = 0
+                    unlockUi()
+                } else {
+                    wrongPinAttempts++
                     Toast.makeText(this, "Galat PIN", Toast.LENGTH_SHORT).show()
+                    if (wrongPinAttempts >= 3) {
+                        triggerSecurityLockdown()
+                        wrongPinAttempts = 0
+                    }
                     promptEnterPin(savedPin)
                 }
             }
@@ -199,6 +216,59 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun unlockUi() {
         micButton.isEnabled = true
         jarvisToggleButton.isEnabled = true
+    }
+
+    private fun requestDeviceAdminIfNeeded() {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        val adminComponent = ComponentName(this, JarvisDeviceAdminReceiver::class.java)
+        if (!dpm.isAdminActive(adminComponent)) {
+            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Security lock feature ke liye ye permission chahiye")
+            }
+            try { startActivity(intent) } catch (e: Exception) { }
+        }
+    }
+
+    private fun triggerSecurityLockdown() {
+        captureIntruderPhoto()
+        try {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            val adminComponent = ComponentName(this, JarvisDeviceAdminReceiver::class.java)
+            if (dpm.isAdminActive(adminComponent)) {
+                dpm.lockNow()
+            }
+        } catch (e: Exception) { }
+    }
+
+    private fun captureIntruderPhoto() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val imageCapture = ImageCapture.Builder().build()
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, imageCapture)
+
+                val photoFile = File(filesDir, "intruder_${System.currentTimeMillis()}.jpg")
+                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                imageCapture.takePicture(
+                    outputOptions,
+                    ContextCompat.getMainExecutor(this),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                            cameraProvider.unbindAll()
+                        }
+                        override fun onError(exception: ImageCaptureException) {
+                            cameraProvider.unbindAll()
+                        }
+                    }
+                )
+            } catch (e: Exception) { }
+        }, ContextCompat.getMainExecutor(this))
     }
 
     // ---------- Tap-to-speak ----------
@@ -263,7 +333,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
             statusLabel.text = "STANDBY"
         } else {
-            requestOverlayPermission()
             requestBatteryOptimizationExemption()
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
@@ -273,12 +342,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusLabel.text = "ALWAYS ON"
         }
     }
-private fun requestOverlayPermission() {
-        if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-            try { startActivity(intent) } catch (e: Exception) { }
-        }
-}
+
     private fun requestBatteryOptimizationExemption() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
