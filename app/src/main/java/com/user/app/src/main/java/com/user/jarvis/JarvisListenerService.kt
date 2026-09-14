@@ -5,20 +5,24 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.content.Context
-import android.os.PowerManager
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.view.View
+import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import java.util.Locale
 import java.util.UUID
@@ -45,7 +49,9 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
     private var isSpeaking = false
     private var isServiceActive = false
     private var isAwaitingCommand = false
-private var wakeLock: PowerManager.WakeLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var overlayView: View? = null
+
     override fun onCreate() {
         super.onCreate()
         tts = TextToSpeech(this, this)
@@ -67,9 +73,11 @@ private var wakeLock: PowerManager.WakeLock? = null
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
+
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Jarvis::ListenerWakeLock")
         wakeLock?.acquire(10 * 60 * 60 * 1000L)
+        addOverlayIfPermitted()
         isServiceActive = true
         startListeningCycle()
         return START_STICKY
@@ -99,10 +107,9 @@ private var wakeLock: PowerManager.WakeLock? = null
         if (!isServiceActive || isSpeaking) return
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-            // Give more pause tolerance so "Jarvis... (pause) ...command" isn't cut short
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
@@ -119,13 +126,40 @@ private var wakeLock: PowerManager.WakeLock? = null
         handler.postDelayed({ startListeningCycle() }, RESTART_DELAY_MS)
     }
 
+    private fun addOverlayIfPermitted() {
+        if (!Settings.canDrawOverlays(this) || overlayView != null) return
+        try {
+            val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val view = View(this)
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+            val params = WindowManager.LayoutParams(
+                1, 1, type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            )
+            windowManager.addView(view, params)
+            overlayView = view
+        } catch (e: Exception) { }
+    }
+
+    private fun removeOverlay() {
+        val view = overlayView ?: return
+        try {
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view)
+        } catch (e: Exception) { }
+        overlayView = null
+    }
+
     private val recognitionListener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
 
-            // If we just said "Ji bolo", treat whatever comes next as the
-            // command directly — no need to say "Jarvis" again.
             if (isAwaitingCommand) {
                 isAwaitingCommand = false
                 if (heard.isBlank()) {
@@ -147,14 +181,11 @@ private var wakeLock: PowerManager.WakeLock? = null
                     commandExecutor.execute(commandAfterWakeWord)
                 }
             } else {
-                // No wake word heard — keep listening silently, don't react.
                 scheduleRestart()
             }
         }
 
         override fun onError(error: Int) {
-            // ERROR_NO_MATCH / ERROR_SPEECH_TIMEOUT happen constantly in always-on
-            // mode (silence between sentences) — just restart quietly.
             if (isAwaitingCommand) {
                 isAwaitingCommand = false
             }
@@ -174,16 +205,14 @@ private var wakeLock: PowerManager.WakeLock? = null
         updateNotification(text)
         val utteranceId = UUID.randomUUID().toString()
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
-        // onStart/onDone of the utterance listener pause/resume listening
-        // so Jarvis doesn't hear itself talking.
     }
 
     private fun stopListeningAndSelf() {
-        wakeLock?.let { if (it.isHeld) it.release() }
         isServiceActive = false
-        wakeLock?.let { if (it.isHeld) it.release() }
         handler.removeCallbacksAndMessages(null)
+        removeOverlay()
         speechRecognizer.stopListening()
+        wakeLock?.let { if (it.isHeld) it.release() }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -211,20 +240,4 @@ private var wakeLock: PowerManager.WakeLock? = null
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID, "Jarvis Listener", NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Jarvis background listening status"
-        }
-        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-    }
-
-    override fun onDestroy() {
-        isServiceActive = false
-        handler.removeCallbacksAndMessages(null)
-        speechRecognizer.destroy()
-        tts.stop()
-        tts.shutdown()
-        super.onDestroy()
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-}
+        ).app
