@@ -14,13 +14,19 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.location.LocationManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Handler
+import android.os.Looper
 import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -36,6 +42,7 @@ class CommandExecutor(
     private val messageSender = MessageSender(context)
     private val prefs: SharedPreferences =
         context.getSharedPreferences("jarvis_notes", Context.MODE_PRIVATE)
+    private val httpClient = OkHttpClient()
 
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
@@ -194,6 +201,7 @@ class CommandExecutor(
                     onSpeak("Contact nahi bana paya")
                 }
             }
+            Command.GetWeather -> fetchWeatherForCurrentLocation()
             is Command.ChatReply -> onSpeak(command.text)
             Command.LockPhone -> {
                 val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -248,6 +256,59 @@ class CommandExecutor(
             Command.SilentModeOff -> setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
             is Command.Unknown -> onSpeak("Samajh nahi aaya")
         }
+    }
+
+    private fun fetchWeatherForCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            onSpeak("Location permission nahi hai mausam batane ke liye")
+            return
+        }
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        var lat: Double? = null
+        var lon: Double? = null
+        try {
+            for (provider in locationManager.getProviders(true)) {
+                val loc = locationManager.getLastKnownLocation(provider) ?: continue
+                lat = loc.latitude
+                lon = loc.longitude
+                break
+            }
+        } catch (e: Exception) { }
+
+        if (lat == null || lon == null) {
+            onSpeak("Location nahi mil paayi, GPS on karke try karo")
+            return
+        }
+
+        val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true"
+        Thread {
+            try {
+                val request = Request.Builder().url(url).build()
+                httpClient.newCall(request).execute().use { response ->
+                    val json = JSONObject(response.body?.string().orEmpty())
+                    val current = json.getJSONObject("current_weather")
+                    val temp = current.getDouble("temperature")
+                    val code = current.getInt("weathercode")
+                    val description = weatherCodeToText(code)
+                    val message = "Abhi temperature ${temp.toInt()} degree hai, $description"
+                    Handler(Looper.getMainLooper()).post { onSpeak(message) }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
+            }
+        }.start()
+    }
+
+    private fun weatherCodeToText(code: Int): String = when (code) {
+        0 -> "saaf aasmaan hai"
+        1, 2, 3 -> "halke badal hain"
+        45, 48 -> "kohra hai"
+        51, 53, 55 -> "halki boondabaandi hai"
+        61, 63, 65 -> "baarish ho rahi hai"
+        71, 73, 75 -> "baraf gir rahi hai"
+        80, 81, 82 -> "tez baarish ho sakti hai"
+        95, 96, 99 -> "toofan ya aandhi ho sakti hai"
+        else -> "mausam mixed hai"
     }
 
     private fun scheduleReminder(triggerAtMillis: Long, text: String, hour: Int, minute: Int, isRecurring: Boolean) {
