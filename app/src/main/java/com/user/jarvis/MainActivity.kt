@@ -318,8 +318,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
         }
         stateLabel.text = "Sun raha hoon..."
         speechRecognizer.startListening(intent)
@@ -384,25 +384,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun speak(text: String) {
-        jarvisReplyText.text = text
+        val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
+        jarvisReplyText.text = cleanText
         stateLabel.text = "Mic dabao aur bolo"
         SciFiTone.play()
-        val segments = EmphasisTextParser.parseSegments(text)
-        if (segments.isEmpty()) {
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
-            return
-        }
-        segments.forEachIndexed { index, pair ->
-            val segmentText = pair.first
-            val isEmphasized = pair.second
-            val params = Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, if (isEmphasized) 1.0f else 0.78f)
-            }
-            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            tts.speak(segmentText, queueMode, params, "seg_${index}_${System.currentTimeMillis()}")
-        }
+        tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
     }
-
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
