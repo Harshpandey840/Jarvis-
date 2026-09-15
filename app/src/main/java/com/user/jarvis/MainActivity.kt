@@ -386,7 +386,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun speak(text: String) {
         jarvisReplyText.text = text
         stateLabel.text = "Mic dabao aur bolo"
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        SciFiTone.play()
+        val segments = EmphasisTextParser.parseSegments(text)
+        if (segments.isEmpty()) {
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+            return
+        }
+        segments.forEachIndexed { index, pair ->
+            val segmentText = pair.first
+            val isEmphasized = pair.second
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, if (isEmphasized) 1.0f else 0.78f)
+            }
+            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            tts.speak(segmentText, queueMode, params, "seg_${index}_${System.currentTimeMillis()}")
+        }
     }
 
     private fun hasPermission(permission: String) =
