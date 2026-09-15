@@ -34,7 +34,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         const val NOTIFICATION_ID = 1
         const val ACTION_STOP = "com.user.jarvis.STOP"
         private const val RESTART_DELAY_MS = 400L
-        private const val RESUME_AFTER_SPEAK_DELAY_MS = 600L
+        private const val RESUME_AFTER_SPEAK_DELAY_MS = 500L
     }
 
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -91,23 +91,25 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
                 }
                 override fun onDone(utteranceId: String?) {
                     isSpeaking = false
+                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
                 override fun onError(utteranceId: String?) {
                     isSpeaking = false
+                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
             })
         }
     }
 
     private fun startListeningCycle() {
-        if (!isServiceActive) return
+        if (!isServiceActive || isSpeaking) return
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1000L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 15000L)
         }
         try {
@@ -154,25 +156,6 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
 
-            if (isSpeaking) {
-                val lowerHeard = heard.lowercase()
-                val isInterrupt = listOf("stop", "ruko", "ruk jao", "chup", "band karo", "wait").any { lowerHeard.contains(it) }
-                val wakeCommandWhileSpeaking = WakeWordDetector.stripWakeWord(heard)
-                if (isInterrupt) {
-                    tts.stop()
-                    isSpeaking = false
-                    scheduleRestart()
-                } else if (!wakeCommandWhileSpeaking.isNullOrBlank()) {
-                    tts.stop()
-                    isSpeaking = false
-                    updateNotification("Suna: $heard")
-                    commandExecutor.execute(wakeCommandWhileSpeaking)
-                } else {
-                    scheduleRestart()
-                }
-                return
-            }
-
             if (isAwaitingCommand) {
                 isAwaitingCommand = false
                 if (heard.isBlank()) {
@@ -215,22 +198,10 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun speak(text: String) {
-        updateNotification(text)
+        val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
+        updateNotification(cleanText)
         SciFiTone.play()
-        val segments = EmphasisTextParser.parseSegments(text)
-        if (segments.isEmpty()) {
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
-            return
-        }
-        segments.forEachIndexed { index, pair ->
-            val segmentText = pair.first
-            val isEmphasized = pair.second
-            val params = Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, if (isEmphasized) 1.0f else 0.78f)
-            }
-            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-            tts.speak(segmentText, queueMode, params, "seg_${index}_${UUID.randomUUID()}")
-        }
+        tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
     }
 
     private fun stopListeningAndSelf() {
