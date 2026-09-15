@@ -10,12 +10,10 @@ object WakeWordDetector {
     fun stripWakeWord(rawText: String): String? {
         val lower = rawText.trim().lowercase()
         for (variant in WAKE_VARIANTS) {
-            val idx = lower.indexOf(variant)
-            if (idx != -1) {
-                val after = rawText.substring(idx + variant.length).trim()
+            if (lower.startsWith(variant)) {
+                val after = rawText.substring(variant.length).trim()
                 return after
             }
         }
         return null
     }
-}
