@@ -111,6 +111,33 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
 
+    // ---------- Background setup checker ----------
+
+    private fun getMissingBackgroundPermissions(): List<String> {
+        val missing = mutableListOf<String>()
+        if (!Settings.canDrawOverlays(this)) missing.add("Display over other apps")
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!powerManager.isIgnoringBatteryOptimizations(packageName)) missing.add("Battery: No restrictions")
+        return missing
+    }
+
+    private fun showBackgroundSetupDialog(missing: List<String>) {
+        val message = buildString {
+            append("Background mein reliably kaam karne ke liye ye zaroori hai:\n\n")
+            missing.forEach { append("• $it\n") }
+            append("\nInhe on karne ke baad phone ki Settings mein bhi ek baar check kar lena:\n")
+            append("Settings → Apps → Jarvis → Battery → \"No restrictions\"\n")
+            append("Agar tumhare phone (Xiaomi/Vivo/Oppo) mein \"Autostart\" ka option ho, use bhi ON karna — ye humari app khud on nahi kar sakti, Android isliye allow nahi karta.")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Setup zaroori hai")
+            .setMessage(message)
+            .setPositiveButton("Battery settings kholo") { _, _ -> requestBatteryOptimizationExemption() }
+            .setNeutralButton("Overlay settings kholo") { _, _ -> requestOverlayPermission() }
+            .setNegativeButton("Phir bhi start karo") { _, _ -> actuallyStartJarvisService() }
+            .show()
+    }
+
     // ---------- File summarize ----------
 
     private fun handleFileForSummary(uri: Uri) {
@@ -363,14 +390,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
             statusLabel.text = "STANDBY"
         } else {
-            requestBatteryOptimizationExemption()
-            val startIntent = Intent(this, JarvisListenerService::class.java)
-            ContextCompat.startForegroundService(this, startIntent)
-            isJarvisRunning = true
-            jarvisToggleButton.text = "  STOP JARVIS"
-            statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
-            statusLabel.text = "ALWAYS ON"
+            val missing = getMissingBackgroundPermissions()
+            if (missing.isNotEmpty()) {
+                showBackgroundSetupDialog(missing)
+            } else {
+                actuallyStartJarvisService()
+            }
         }
+    }
+
+    private fun actuallyStartJarvisService() {
+        val startIntent = Intent(this, JarvisListenerService::class.java)
+        ContextCompat.startForegroundService(this, startIntent)
+        isJarvisRunning = true
+        jarvisToggleButton.text = "  STOP JARVIS"
+        statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
+        statusLabel.text = "ALWAYS ON"
     }
 
     private fun requestBatteryOptimizationExemption() {
@@ -383,6 +418,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun requestOverlayPermission() {
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            try { startActivity(intent) } catch (e: Exception) { }
+        }
+    }
+
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
         jarvisReplyText.text = cleanText
@@ -390,6 +432,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         SciFiTone.play()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
     }
+
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
