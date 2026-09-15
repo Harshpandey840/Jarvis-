@@ -81,26 +81,27 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale("hi", "IN")
+           tts.language = Locale("hi", "IN")
             VoicePreferences.applySavedVoice(this, tts)
+            tts.setPitch(0.85f)
+            tts.setSpeechRate(0.95f)
             tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {
                     isSpeaking = true
                 }
                 override fun onDone(utteranceId: String?) {
                     isSpeaking = false
-                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
                 override fun onError(utteranceId: String?) {
                     isSpeaking = false
-                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
-            })
+            }) 
+            
         }
     }
 
     private fun startListeningCycle() {
-        if (!isServiceActive || isSpeaking) return
+        if (!isServiceActive) return
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
@@ -153,6 +154,25 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
+
+            if (isSpeaking) {
+                val lowerHeard = heard.lowercase()
+                val isInterrupt = listOf("stop", "ruko", "ruk jao", "chup", "band karo", "wait").any { lowerHeard.contains(it) }
+                val wakeCommandWhileSpeaking = WakeWordDetector.stripWakeWord(heard)
+                if (isInterrupt) {
+                    tts.stop()
+                    isSpeaking = false
+                    scheduleRestart()
+                } else if (!wakeCommandWhileSpeaking.isNullOrBlank()) {
+                    tts.stop()
+                    isSpeaking = false
+                    updateNotification("Suna: $heard")
+                    commandExecutor.execute(wakeCommandWhileSpeaking)
+                } else {
+                    scheduleRestart()
+                }
+                return
+            }
 
             if (isAwaitingCommand) {
                 isAwaitingCommand = false
