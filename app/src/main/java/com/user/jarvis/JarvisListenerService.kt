@@ -81,7 +81,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-           tts.language = Locale("hi", "IN")
+            tts.language = Locale("hi", "IN")
             VoicePreferences.applySavedVoice(this, tts)
             tts.setPitch(0.85f)
             tts.setSpeechRate(0.95f)
@@ -95,8 +95,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
                 override fun onError(utteranceId: String?) {
                     isSpeaking = false
                 }
-            }) 
-            
+            })
         }
     }
 
@@ -150,7 +149,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             (getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view)
         } catch (e: Exception) { }
         overlayView = null
-    } private val recognitionListener = object : RecognitionListener {
+    }private val recognitionListener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
@@ -217,8 +216,21 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     private fun speak(text: String) {
         updateNotification(text)
-        val utteranceId = UUID.randomUUID().toString()
-        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        SciFiTone.play()
+        val segments = EmphasisTextParser.parseSegments(text)
+        if (segments.isEmpty()) {
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString())
+            return
+        }
+        segments.forEachIndexed { index, pair ->
+            val segmentText = pair.first
+            val isEmphasized = pair.second
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, if (isEmphasized) 1.0f else 0.78f)
+            }
+            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            tts.speak(segmentText, queueMode, params, "seg_${index}_${UUID.randomUUID()}")
+        }
     }
 
     private fun stopListeningAndSelf() {
