@@ -17,3 +17,4 @@ object WakeWordDetector {
         }
         return null
     }
+}
