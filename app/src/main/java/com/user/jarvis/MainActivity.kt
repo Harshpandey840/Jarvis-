@@ -305,6 +305,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (status == TextToSpeech.SUCCESS) {
             tts.language = Locale("hi", "IN")
             VoicePreferences.applySavedVoice(this, tts)
+            tts.setPitch(0.85f)
+            tts.setSpeechRate(0.95f)
         }
     }
 
