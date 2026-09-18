@@ -17,7 +17,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="60dp" />
+        android:layout_marginTop="55dp" />
 
     <LinearLayout
         android:id="@+id/statusChip"
@@ -33,7 +33,7 @@
         app:layout_constraintTop_toBottomOf="@id/titleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="14dp">
+        android:layout_marginTop="12dp">
 
         <View
             android:id="@+id/statusDot"
@@ -60,38 +60,38 @@
         android:textColor="@color/accent_cyan_dim"
         android:textSize="10sp"
         android:letterSpacing="0.2"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         app:layout_constraintTop_toBottomOf="@id/statusChip"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <FrameLayout
         android:id="@+id/orbContainer"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
         app:layout_constraintTop_toBottomOf="@id/subtitleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="26dp">
+        android:layout_marginTop="20dp">
 
         <View
             android:id="@+id/pulseRingOuter"
-            android:layout_width="130dp"
-            android:layout_height="130dp"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
             android:layout_gravity="center"
             android:background="@drawable/pulse_ring" />
 
         <View
             android:id="@+id/pulseRingInner"
-            android:layout_width="130dp"
-            android:layout_height="130dp"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
             android:layout_gravity="center"
             android:background="@drawable/pulse_ring" />
 
         <FrameLayout
             android:id="@+id/micButton"
-            android:layout_width="130dp"
-            android:layout_height="130dp"
+            android:layout_width="110dp"
+            android:layout_height="110dp"
             android:layout_gravity="center"
             android:background="@drawable/mic_button_bg"
             android:elevation="10dp"
@@ -100,8 +100,8 @@
             android:foreground="?android:attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="42dp"
-                android:layout_height="42dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_gravity="center"
                 android:src="@drawable/ic_mic" />
         </FrameLayout>
@@ -113,11 +113,11 @@
         android:layout_height="wrap_content"
         android:text="Mic dabao aur bolo"
         android:textColor="@color/text_secondary"
-        android:textSize="14sp"
+        android:textSize="13sp"
         app:layout_constraintTop_toBottomOf="@id/orbContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="14dp" />
+        android:layout_marginTop="12dp" />
 
     <LinearLayout
         android:id="@+id/transcriptCard"
@@ -125,16 +125,16 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@drawable/status_card_bg"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
         app:layout_constraintTop_toBottomOf="@id/stateLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:layout_marginTop="16dp">
+        android:layout_marginStart="28dp"
+        android:layout_marginEnd="28dp"
+        android:layout_marginTop="12dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -150,15 +150,15 @@
             android:layout_height="wrap_content"
             android:text="—"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:layout_marginTop="3dp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="#1F2A33"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="10dp" />
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -174,7 +174,7 @@
             android:layout_height="wrap_content"
             android:text="Ready when you are"
             android:textColor="@color/text_primary"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:layout_marginTop="3dp" />
     </LinearLayout>
 
@@ -187,15 +187,14 @@
         app:layout_constraintBottom_toTopOf="@id/jarvisToggleButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="10dp">
 
         <TextView
             android:id="@+id/voiceSettingsButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🎚 Voice"
-            android:textColor="@color/accent_cyan_dim"
-            android:textSize="11sp"
+            android:text="🎚"
+            android:textSize="16sp"
             android:padding="6dp"
             android:clickable="true"
             android:focusable="true"
@@ -205,9 +204,8 @@
             android:id="@+id/notesListButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📋 Notes"
-            android:textColor="@color/accent_cyan_dim"
-            android:textSize="11sp"
+            android:text="📋"
+            android:textSize="16sp"
             android:padding="6dp"
             android:layout_marginStart="14dp"
             android:clickable="true"
@@ -218,9 +216,20 @@
             android:id="@+id/fileSummaryButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📄 File"
-            android:textColor="@color/accent_cyan_dim"
-            android:textSize="11sp"
+            android:text="📄"
+            android:textSize="16sp"
+            android:padding="6dp"
+            android:layout_marginStart="14dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground" />
+
+        <TextView
+            android:id="@+id/securityModeButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔒"
+            android:textSize="16sp"
             android:padding="6dp"
             android:layout_marginStart="14dp"
             android:clickable="true"
@@ -231,20 +240,308 @@
     <Button
         android:id="@+id/jarvisToggleButton"
         android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:layout_marginStart="32dp"
-        android:layout_marginEnd="32dp"
-        android:layout_marginBottom="30dp"
+        android:layout_height="52dp"
+        android:layout_marginStart="28dp"
+        android:layout_marginEnd="28dp"
+        android:layout_marginBottom="26dp"
         android:text="  START JARVIS · ALWAYS ON"
-        android:textSize="12sp"
+        android:textSize="11sp"
         android:letterSpacing="0.06"
         android:background="@drawable/toggle_button_bg"
         android:textColor="@color/accent_cyan"
         android:drawableStart="@drawable/ic_power"
-        android:drawablePadding="10dp"
+        android:drawablePadding="8dp"
         android:gravity="center"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>package com.user.jarvis
+
+import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.app.AlertDialog
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.text.InputType
+import android.view.View
+import android.view.animation.LinearInterpolator
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import java.io.File
+import java.io.FileOutputStream
+import java.util.Locale
+
+class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
+
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var tts: TextToSpeech
+    private lateinit var stateLabel: TextView
+    private lateinit var youSaidText: TextView
+    private lateinit var jarvisReplyText: TextView
+    private lateinit var statusDot: View
+    private lateinit var statusLabel: TextView
+    private lateinit var micButton: View
+    private lateinit var voiceSettingsButton: TextView
+    private lateinit var notesListButton: TextView
+    private lateinit var fileSummaryButton: TextView
+    private lateinit var securityModeButton: TextView
+    private lateinit var jarvisToggleButton: Button
+
+    private lateinit var commandExecutor: CommandExecutor
+    private var isJarvisRunning = false
+    private var wrongPinAttempts = 0
+
+    private val requiredPermissions = arrayOf(
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.SEND_SMS,
+        Manifest.permission.READ_CONTACTS,
+        Manifest.permission.CALL_PHONE,
+        Manifest.permission.CAMERA,
+        Manifest.permission.ACCESS_COARSE_LOCATION
+    ).let {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) it + Manifest.permission.POST_NOTIFICATIONS else it
+    }
+
+    private val permissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
+    private val fileSummaryLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) handleFileForSummary(uri) }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        stateLabel = findViewById(R.id.stateLabel)
+        youSaidText = findViewById(R.id.youSaidText)
+        jarvisReplyText = findViewById(R.id.jarvisReplyText)
+        statusDot = findViewById(R.id.statusDot)
+        statusLabel = findViewById(R.id.statusLabel)
+        micButton = findViewById(R.id.micButton)
+        voiceSettingsButton = findViewById(R.id.voiceSettingsButton)
+        notesListButton = findViewById(R.id.notesListButton)
+        fileSummaryButton = findViewById(R.id.fileSummaryButton)
+        securityModeButton = findViewById(R.id.securityModeButton)
+        jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
+
+        statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
+
+        commandExecutor = CommandExecutor(this) { speak(it) }
+
+        tts = TextToSpeech(this, this)
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer.setRecognitionListener(recognitionListener)
+
+        permissionLauncher.launch(requiredPermissions)
+
+        micButton.setOnClickListener { startListening() }
+        jarvisToggleButton.setOnClickListener { toggleJarvisService() }
+        voiceSettingsButton.setOnClickListener { showVoicePicker() }
+        notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
+        fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
+        securityModeButton.setOnClickListener { onSecurityModeClicked() }
+
+        setupPulseAnimation()
+        lockUiUntilPinVerified()
+    }
+
+    private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
+
+    // ---------- Security Mode (face recognition lock) ----------
+
+    private fun onSecurityModeClicked() {
+        if (FaceSecurityPrefs.isEnabled(this)) {
+            AlertDialog.Builder(this)
+                .setTitle("Security Mode")
+                .setMessage("Security Mode ON hai. Band karna hai?")
+                .setPositiveButton("Band karo") { _, _ ->
+                    FaceSecurityPrefs.setEnabled(this, false)
+                    Toast.makeText(this, "Security Mode band kar diya", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Rehne do", null)
+                .show()
+        } else {
+            AlertDialog.Builder(this)
+                .setTitle("Security Mode Enable karo")
+                .setMessage("Apna face enroll karna hoga. Camera ke saamne seedha dekho aur OK dabao.")
+                .setPositiveButton("OK") { _, _ -> enrollFace() }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+
+    private fun enrollFace() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Camera permission chahiye", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val imageCapture = ImageCapture.Builder().build()
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, imageCapture)
+
+                val photoFile = File(cacheDir, "enroll_temp.jpg")
+                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                imageCapture.takePicture(
+                    outputOptions,
+                    ContextCompat.getMainExecutor(this),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                            cameraProvider.unbindAll()
+                            processEnrollmentPhoto(photoFile)
+                        }
+                        override fun onError(exception: ImageCaptureException) {
+                            cameraProvider.unbindAll()
+                            Toast.makeText(this@MainActivity, "Photo capture fail hua", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Toast.makeText(this, "Camera error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun processEnrollmentPhoto(photoFile: File) {
+        val bitmap = BitmapFactory.decodeFile(photoFile.path)
+        if (bitmap == null) {
+            Toast.makeText(this, "Photo padh nahi paya", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        val options = FaceDetectorOptions.Builder()
+            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+            .build()
+        FaceDetection.getClient(options).process(inputImage)
+            .addOnSuccessListener { faces ->
+                if (faces.isEmpty()) {
+                    Toast.makeText(this, "Face detect nahi hua, dobara try karo", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+                val box = faces[0].boundingBox
+                try {
+                    val cropped = Bitmap.createBitmap(
+                        bitmap,
+                        box.left.coerceIn(0, bitmap.width - 1),
+                        box.top.coerceIn(0, bitmap.height - 1),
+                        box.width().coerceIn(1, bitmap.width - box.left.coerceIn(0, bitmap.width - 1)),
+                        box.height().coerceIn(1, bitmap.height - box.top.coerceIn(0, bitmap.height - 1))
+                    )
+                    val refFile = File(filesDir, "reference_face.jpg")
+                    FileOutputStream(refFile).use { out ->
+                        cropped.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    }
+                    FaceSecurityPrefs.setReferenceFacePath(this, refFile.path)
+                    FaceSecurityPrefs.setEnabled(this, true)
+                    requestDeviceAdminIfNeeded()
+                    Toast.makeText(this, "Face enroll ho gaya, Security Mode ON", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Crop fail hua", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(this, "Face detection fail hua", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    // ---------- File summarize ----------
+
+    private fun handleFileForSummary(uri: Uri) {
+        stateLabel.text = "File padh raha hoon..."
+        try {
+            val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (text.isBlank()) {
+                speak("Is file mein text nahi mila")
+                return
+            }
+            stateLabel.text = "Summarize kar raha hoon..."
+            AiCommandParser.summarizeText(text, BuildConfig.GEMINI_API_KEY) { summary ->
+                youSaidText.text = "[File summary]"
+                speak(summary)
+            }
+        } catch (e: Exception) {
+            speak("File nahi padh paya")
+        }
+    }
+
+    // ---------- Voice picker ----------
+
+    private fun showVoicePicker() {
+        val voices = VoicePreferences.getCandidateVoices(tts)
+        if (voices.isEmpty()) {
+            Toast.makeText(this, "Koi extra voice nahi mili is phone mein", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = voices.map { VoicePreferences.displayName(it) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Voice choose karo")
+            .setItems(names) { _, which ->
+                val chosen = voices[which]
+                tts.voice = chosen
+                VoicePreferences.saveVoiceName(this, chosen.name)
+                tts.speak("Namaste, main Jarvis hoon. Kaisi lagi ye awaaz?", TextToSpeech.QUEUE_FLUSH, null, null)
+            }
+            .setNegativeButton("Band karo", null)
+            .show()
+    }
+
+    // ---------- Orb pulse animation ----------
+
+    private fun setupPulseAnimation() {
+        pulseView(findViewById(R.id.pulseRingOuter), 0L)
+        pulseView(findViewById(R.id.pulseRingInner), 800L)
+    }
+
+    private fun pulseView(view: View, delay: Long) {
+        view.alpha = 0f
+        val scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.7f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.7f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.55f, 0f).apply {
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        AnimatorSet().apply {
+            playTogether(scaleX, scaleY, alpha)
+            duration = 1700
+            startDelay = delay
+            interpolator = LinearInterpolator()
+            start()
+        }
+    }
