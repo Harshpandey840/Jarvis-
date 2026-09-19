@@ -117,7 +117,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         setupPulseAnimation()
         lockUiUntilPinVerified()
     }
-
+override fun onResume() {
+        super.onResume()
+        if (FaceSecurityPrefs.isEnabled(this) && FaceSecurityPrefs.getReferenceFacePath(this) != null) {
+            val intent = Intent(this, FaceSecurityService::class.java)
+            try {
+                ContextCompat.startForegroundService(this, intent)
+            } catch (e: Exception) { }
+        }
+}
     private fun getColorCompat(resId: Int) = ContextCompat.getColor(this, resId)
 
     // ---------- Security Mode (face recognition lock) ----------
