@@ -24,9 +24,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.rementia.openwakeword.lib.DetectionMode
-import com.rementia.openwakeword.lib.WakeWordEngine
-import com.rementia.openwakeword.lib.WakeWordModel
+import com.rementia.openwakeword.lib.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
