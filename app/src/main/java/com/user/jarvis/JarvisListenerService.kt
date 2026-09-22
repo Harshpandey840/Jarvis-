@@ -24,12 +24,6 @@ import android.speech.tts.UtteranceProgressListener
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.rementia.openwakeword.lib.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.UUID
 
@@ -40,20 +34,17 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         const val NOTIFICATION_ID = 1
         const val ACTION_STOP = "com.user.jarvis.STOP"
         private const val RESTART_DELAY_MS = 400L
+        private const val RESUME_AFTER_SPEAK_DELAY_MS = 500L
     }
-
-    private enum class JarvisState { IDLE, PROMPTING, AWAITING_COMMAND, RESPONDING }
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var tts: TextToSpeech
     private lateinit var commandExecutor: CommandExecutor
     private val handler = Handler(Looper.getMainLooper())
-    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    private var wakeWordEngine: WakeWordEngine? = null
-    private var state = JarvisState.IDLE
     private var isSpeaking = false
     private var isServiceActive = false
+    private var isAwaitingCommand = false
     private var wakeLock: PowerManager.WakeLock? = null
     private var overlayView: View? = null
 
@@ -64,27 +55,6 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         speechRecognizer.setRecognitionListener(recognitionListener)
         commandExecutor = CommandExecutor(this) { speak(it) }
         createNotificationChannel()
-        setupWakeWordEngine()
-    }
-
-    private fun setupWakeWordEngine() {
-        try {
-            val models = listOf(WakeWordModel("Jarvis", "hey_jarvis_v0.1.onnx", 0.5f))
-            val engine = WakeWordEngine(
-                context = applicationContext,
-                models = models,
-                detectionMode = DetectionMode.SINGLE_BEST,
-                scope = serviceScope
-            )
-            wakeWordEngine = engine
-            serviceScope.launch {
-                engine.detections.collect {
-                    handler.post { onWakeWordDetected() }
-                }
-            }
-        } catch (e: Exception) {
-            updateNotification("Wake word setup error: ${e.message}")
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -93,7 +63,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             return START_NOT_STICKY
         }
 
-        val notification = buildNotification("Jarvis active hai (bolo: Jarvis)")
+        val notification = buildNotification("Sun raha hoon (bolo: Jarvis...)")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
@@ -105,8 +75,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         wakeLock?.acquire(10 * 60 * 60 * 1000L)
         addOverlayIfPermitted()
         isServiceActive = true
-        state = JarvisState.IDLE
-        startWakeWordListening()
+        startListeningCycle()
         return START_STICKY
     }
 
@@ -122,53 +91,18 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
                 }
                 override fun onDone(utteranceId: String?) {
                     isSpeaking = false
-                    if (utteranceId == "wake_prompt") {
-                        startCommandCapture()
-                    } else {
-                        state = JarvisState.IDLE
-                        handler.postDelayed({ startWakeWordListening() }, 300L)
-                    }
+                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
                 override fun onError(utteranceId: String?) {
                     isSpeaking = false
-                    if (utteranceId == "wake_prompt") {
-                        startCommandCapture()
-                    } else {
-                        state = JarvisState.IDLE
-                        handler.postDelayed({ startWakeWordListening() }, 300L)
-                    }
+                    handler.postDelayed({ startListeningCycle() }, RESUME_AFTER_SPEAK_DELAY_MS)
                 }
             })
         }
     }
 
-    private fun startWakeWordListening() {
-        if (!isServiceActive || state != JarvisState.IDLE) return
-        try {
-            wakeWordEngine?.start()
-            updateNotification("Jarvis active hai (bolo: Jarvis)")
-        } catch (e: Exception) {
-            updateNotification("Wake word error: ${e.message}")
-            handler.postDelayed({ startWakeWordListening() }, 3000L)
-        }
-    }
-
-    private fun stopWakeWordListening() {
-        try { wakeWordEngine?.stop() } catch (e: Exception) { }
-    }
-
-    private fun onWakeWordDetected() {
-        if (!isServiceActive || state != JarvisState.IDLE) return
-        state = JarvisState.PROMPTING
-        stopWakeWordListening()
-        updateNotification("Ji bolo...")
-        SciFiTone.play()
-        tts.speak("Yes?", TextToSpeech.QUEUE_FLUSH, null, "wake_prompt")
-    }
-
-    private fun startCommandCapture() {
-        if (!isServiceActive) return
-        state = JarvisState.AWAITING_COMMAND
+    private fun startListeningCycle() {
+        if (!isServiceActive || isSpeaking) return
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
@@ -181,9 +115,13 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         try {
             speechRecognizer.startListening(intent)
         } catch (e: Exception) {
-            state = JarvisState.IDLE
-            handler.postDelayed({ startWakeWordListening() }, RESTART_DELAY_MS)
+            scheduleRestart()
         }
+    }
+
+    private fun scheduleRestart() {
+        if (!isServiceActive) return
+        handler.postDelayed({ startListeningCycle() }, RESTART_DELAY_MS)
     }
 
     private fun addOverlayIfPermitted() {
@@ -218,19 +156,36 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val heard = matches?.firstOrNull().orEmpty()
 
-            if (heard.isBlank()) {
-                state = JarvisState.IDLE
-                handler.postDelayed({ startWakeWordListening() }, RESTART_DELAY_MS)
-            } else {
-                state = JarvisState.RESPONDING
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+                if (heard.isBlank()) {
+                    scheduleRestart()
+                } else {
+                    updateNotification("Suna: $heard")
+                    commandExecutor.execute(heard)
+                }
+                return
+            }
+
+            val commandAfterWakeWord = WakeWordDetector.stripWakeWord(heard)
+            if (commandAfterWakeWord != null) {
                 updateNotification("Suna: $heard")
-                commandExecutor.execute(heard)
+                if (commandAfterWakeWord.isBlank()) {
+                    isAwaitingCommand = true
+                    speak("Ji bolo")
+                } else {
+                    commandExecutor.execute(commandAfterWakeWord)
+                }
+            } else {
+                scheduleRestart()
             }
         }
 
         override fun onError(error: Int) {
-            state = JarvisState.IDLE
-            handler.postDelayed({ startWakeWordListening() }, RESTART_DELAY_MS)
+            if (isAwaitingCommand) {
+                isAwaitingCommand = false
+            }
+            scheduleRestart()
         }
 
         override fun onReadyForSpeech(params: Bundle?) {}
@@ -253,11 +208,8 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         isServiceActive = false
         handler.removeCallbacksAndMessages(null)
         removeOverlay()
-        stopWakeWordListening()
-        try { wakeWordEngine?.release() } catch (e: Exception) { }
-        try { speechRecognizer.stopListening() } catch (e: Exception) { }
+        speechRecognizer.stopListening()
         wakeLock?.let { if (it.isHeld) it.release() }
-        serviceScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -295,11 +247,8 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         isServiceActive = false
         handler.removeCallbacksAndMessages(null)
         removeOverlay()
-        stopWakeWordListening()
-        try { wakeWordEngine?.release() } catch (e: Exception) { }
         speechRecognizer.destroy()
         wakeLock?.let { if (it.isHeld) it.release() }
-        serviceScope.cancel()
         tts.stop()
         tts.shutdown()
         super.onDestroy()
