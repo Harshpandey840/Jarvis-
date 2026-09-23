@@ -115,6 +115,7 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         try {
             speechRecognizer.startListening(intent)
         } catch (e: Exception) {
+            updateNotification("Start failed: ${e.javaClass.simpleName}")
             scheduleRestart()
         }
     }
@@ -184,6 +185,21 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
         override fun onError(error: Int) {
             if (isAwaitingCommand) {
                 isAwaitingCommand = false
+            }
+            val errorName = when (error) {
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
+                SpeechRecognizer.ERROR_NETWORK -> "ERROR_NETWORK"
+                SpeechRecognizer.ERROR_AUDIO -> "ERROR_AUDIO"
+                SpeechRecognizer.ERROR_SERVER -> "ERROR_SERVER"
+                SpeechRecognizer.ERROR_CLIENT -> "ERROR_CLIENT"
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "ERROR_SPEECH_TIMEOUT"
+                SpeechRecognizer.ERROR_NO_MATCH -> "ERROR_NO_MATCH"
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "ERROR_RECOGNIZER_BUSY"
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "ERROR_INSUFFICIENT_PERMISSIONS"
+                else -> "ERROR_CODE_$error"
+            }
+            if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                updateNotification("Restart: $errorName")
             }
             scheduleRestart()
         }
