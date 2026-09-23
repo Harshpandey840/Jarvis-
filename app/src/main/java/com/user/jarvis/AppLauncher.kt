@@ -9,65 +9,68 @@ class AppLauncher(
     private val context: Context
 ) {
 
-    private val pm =
+    private val pm: PackageManager =
         context.packageManager
-
-    private val packages =
-        mapOf(
-            "youtube" to
-                "com.google.android.youtube",
-
-            "yt" to
-                "com.google.android.youtube",
-
-            "instagram" to
-                "com.instagram.android",
-
-            "insta" to
-                "com.instagram.android",
-
-            "whatsapp" to
-                "com.whatsapp",
-
-            "chrome" to
-                "com.android.chrome",
-
-            "google chrome" to
-                "com.android.chrome",
-
-            "facebook" to
-                "com.facebook.katana",
-
-            "fb" to
-                "com.facebook.katana",
-
-            "telegram" to
-                "org.telegram.messenger",
-
-            "google maps" to
-                "com.google.android.apps.maps",
-
-            "maps" to
-                "com.google.android.apps.maps",
-
-            "play store" to
-                "com.android.vending",
-
-            "playstore" to
-                "com.android.vending"
-        )
 
     fun openApp(
         spokenName: String
     ): Boolean {
 
         val target =
-            normalize(spokenName)
+            normalize(
+                spokenName
+            )
 
-        // ---------------------------------------------
+        val directPackages =
+            mapOf(
+
+                "youtube" to
+                        "com.google.android.youtube",
+
+                "yt" to
+                        "com.google.android.youtube",
+
+                "instagram" to
+                        "com.instagram.android",
+
+                "insta" to
+                        "com.instagram.android",
+
+                "whatsapp" to
+                        "com.whatsapp",
+
+                "whatsappmessenger" to
+                        "com.whatsapp",
+
+                "chrome" to
+                        "com.android.chrome",
+
+                "googlechrome" to
+                        "com.android.chrome",
+
+                "facebook" to
+                        "com.facebook.katana",
+
+                "fb" to
+                        "com.facebook.katana",
+
+                "telegram" to
+                        "org.telegram.messenger",
+
+                "maps" to
+                        "com.google.android.apps.maps",
+
+                "googlemaps" to
+                        "com.google.android.apps.maps",
+
+                "playstore" to
+                        "com.android.vending",
+
+                "googleplaystore" to
+                        "com.android.vending"
+            )
+
         // SETTINGS
-        // ---------------------------------------------
-
         if (
             target == "settings" ||
             target == "setting"
@@ -79,12 +82,15 @@ class AppLauncher(
                     Intent(
                         Settings.ACTION_SETTINGS
                     ).apply {
+
                         addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK
                         )
                     }
 
-                context.startActivity(intent)
+                context.startActivity(
+                    intent
+                )
 
                 true
 
@@ -94,80 +100,42 @@ class AppLauncher(
             }
         }
 
-        // ---------------------------------------------
         // DIRECT PACKAGE
-        // ---------------------------------------------
-
         val directPackage =
-            packages[target]
+            directPackages[target]
 
         if (
             directPackage != null &&
-            isInstalled(directPackage)
+            isPackageInstalled(
+                directPackage
+            )
         ) {
 
-            val launchIntent =
+            val intent =
                 pm.getLaunchIntentForPackage(
                     directPackage
                 )
 
-            if (launchIntent != null) {
+            if (intent != null) {
 
-                launchIntent.addFlags(
+                intent.addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK
                 )
 
-                try {
+                context.startActivity(
+                    intent
+                )
 
-                    context.startActivity(
-                        launchIntent
-                    )
-
-                    return true
-
-                } catch (_: Exception) {
-                }
+                return true
             }
         }
 
-        // ---------------------------------------------
-        // CAMERA
-        // ---------------------------------------------
-
-        if (
-            target == "camera" ||
-            target == "cam"
-        ) {
-
-            return try {
-
-                val intent =
-                    Intent(
-                        "android.media.action.IMAGE_CAPTURE"
-                    ).apply {
-                        addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-                    }
-
-                context.startActivity(intent)
-
-                true
-
-            } catch (_: Exception) {
-
-                false
-            }
-        }
-
-        // ---------------------------------------------
-        // GENERIC INSTALLED APP SEARCH
-        // ---------------------------------------------
-
-        return openByLauncherName(target)
+        return openByAppName(
+            target
+        )
     }
 
-    private fun openByLauncherName(
+    private fun openByAppName(
         target: String
     ): Boolean {
 
@@ -188,7 +156,6 @@ class AppLauncher(
                 0
             )
 
-        // Exact
         var best =
             apps.firstOrNull {
 
@@ -197,7 +164,6 @@ class AppLauncher(
                 ) == target
             }
 
-        // Contains
         if (best == null) {
 
             best =
@@ -216,19 +182,16 @@ class AppLauncher(
                     }
         }
 
-        // Reverse contains
         if (best == null) {
 
             best =
                 apps.firstOrNull {
 
-                    val label =
+                    target.contains(
                         normalize(
                             it.loadLabel(pm).toString()
                         )
-
-                    label.isNotBlank() &&
-                        target.contains(label)
+                    )
                 }
         }
 
@@ -242,25 +205,21 @@ class AppLauncher(
         val intent =
             pm.getLaunchIntentForPackage(
                 packageName
-            ) ?: return false
+            )
+                ?: return false
 
         intent.addFlags(
             Intent.FLAG_ACTIVITY_NEW_TASK
         )
 
-        return try {
+        context.startActivity(
+            intent
+        )
 
-            context.startActivity(intent)
-
-            true
-
-        } catch (_: Exception) {
-
-            false
-        }
+        return true
     }
 
-    private fun isInstalled(
+    private fun isPackageInstalled(
         packageName: String
     ): Boolean {
 
@@ -288,9 +247,8 @@ class AppLauncher(
         return value
             .lowercase()
             .replace(
-                Regex("\\s+"),
-                " "
+                Regex("[^a-z0-9]"),
+                ""
             )
-            .trim()
     }
 }
