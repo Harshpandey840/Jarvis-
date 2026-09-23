@@ -16,11 +16,11 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 
 class JarvisListenerService : Service(),
     TextToSpeech.OnInitListener {
@@ -33,17 +33,17 @@ class JarvisListenerService : Service(),
         private const val NOTIFICATION_ID =
             1001
 
-        private const val RESTART_DELAY =
-            350L
-
         private const val COMMAND_TIMEOUT =
             6000L
 
         private const val AFTER_SPEAK_DELAY =
             350L
 
-        private const val WAKE_LISTEN_DELAY =
-            150L
+        private const val WAKE_RESTART_DELAY =
+            250L
+
+        private const val START_DELAY =
+            1000L
 
         private const val TAG =
             "JarvisListenerService"
@@ -59,8 +59,7 @@ class JarvisListenerService : Service(),
     private var speechRecognizer:
             SpeechRecognizer? = null
 
-    private lateinit var tts:
-            TextToSpeech
+    private lateinit var tts: TextToSpeech
 
     private var ttsReady =
         false
@@ -84,6 +83,16 @@ class JarvisListenerService : Service(),
         false
 
     // ============================================================
+    // OPEN WAKE WORD
+    // ============================================================
+
+    private var wakeWordEngine:
+            JarvisWakeWordEngine? = null
+
+    private var wakeWordRestartRunnable:
+            Runnable? = null
+
+    // ============================================================
     // WAKE LOCK
     // ============================================================
 
@@ -105,22 +114,11 @@ class JarvisListenerService : Service(),
             CommandExecutor
 
     // ============================================================
-    // RECOGNIZER MODE
-    // ============================================================
-
-    private enum class ListenMode {
-        WAKE,
-        COMMAND
-    }
-
-    private var listenMode =
-        ListenMode.WAKE
-
-    // ============================================================
-    // START SERVICE
+    // START
     // ============================================================
 
     override fun onCreate() {
+
         super.onCreate()
 
         serviceActive = true
@@ -136,185 +134,348 @@ class JarvisListenerService : Service(),
 
         acquireWakeLock()
 
-        // --------------------------------------------------------
+        // ========================================================
         // TTS
-        // --------------------------------------------------------
+        // ========================================================
 
-        tts = TextToSpeech(
-            applicationContext,
-            this
-        )
+        tts =
+            TextToSpeech(
+                applicationContext,
+                this
+            )
 
-        // --------------------------------------------------------
+        // ========================================================
         // COMMAND EXECUTOR
-        // --------------------------------------------------------
+        // ========================================================
 
         commandExecutor =
             CommandExecutor(
+                applicationContext,
+
+                // SPEAK CALLBACK
+                { text ->
+
+                    handler.post {
+
+                        if (serviceActive) {
+                            speak(text)
+                        }
+                    }
+                },
+
+                // FINISHED CALLBACK
+                {
+                    handler.post {
+
+                        if (
+                            serviceActive &&
+                            !isSpeaking &&
+                            !waitingForCommand
+                        ) {
+
+                            scheduleWakeWordRestart(
+                                WAKE_RESTART_DELAY
+                            )
+                        }
+                    }
+                }
+            )
+
+        // ========================================================
+        // SPEECH RECOGNIZER
+        // ========================================================
+
+        createSpeechRecognizer()
+
+        // ========================================================
+        // OPEN WAKE WORD
+        // ========================================================
+
+        wakeWordEngine =
+            JarvisWakeWordEngine(
                 applicationContext
-            ) { text ->
+            ) {
 
                 handler.post {
 
                     if (serviceActive) {
-                        speak(text)
+                        onWakeWordDetected()
                     }
                 }
             }
 
-        // --------------------------------------------------------
-        // SPEECH RECOGNIZER
-        // --------------------------------------------------------
-
-        createSpeechRecognizer()
-
-        // --------------------------------------------------------
-        // START WAKE LISTENING
-        // --------------------------------------------------------
+        // ========================================================
+        // START
+        // ========================================================
 
         handler.postDelayed(
             {
+
                 if (serviceActive) {
-                    startWakeListening()
+
+                    startWakeWordDetection()
                 }
+
             },
-            700L
+            START_DELAY
         )
     }
 
     // ============================================================
-    // TTS INITIALIZATION
+    // TTS INIT
     // ============================================================
 
-    override fun onInit(status: Int) {
+    override fun onInit(
+        status: Int
+    ) {
 
-        if (status ==
+        if (
+            status !=
             TextToSpeech.SUCCESS
         ) {
+            return
+        }
 
-            ttsReady = true
+        ttsReady = true
 
-            try {
+        try {
 
-                val result =
-                    tts.setLanguage(
-                        Locale("en", "IN")
-                    )
-
-                if (
-                    result ==
-                    TextToSpeech.LANG_MISSING_DATA ||
-                    result ==
-                    TextToSpeech.LANG_NOT_SUPPORTED
-                ) {
-
-                    tts.setLanguage(
-                        Locale.US
-                    )
-                }
-
-                tts.setSpeechRate(
-                    1.0f
+            val result =
+                tts.setLanguage(
+                    Locale("en", "IN")
                 )
 
-                tts.setPitch(
-                    1.0f
-                )
+            if (
+                result ==
+                TextToSpeech.LANG_MISSING_DATA ||
+                result ==
+                TextToSpeech.LANG_NOT_SUPPORTED
+            ) {
 
-            } catch (_: Exception) {
+                tts.setLanguage(
+                    Locale.US
+                )
             }
 
-            try {
+            tts.setSpeechRate(
+                1.0f
+            )
 
-                tts.setOnUtteranceProgressListener(
-                    object :
-                        android.speech.tts.UtteranceProgressListener() {
+            tts.setPitch(
+                1.0f
+            )
 
-                        override fun onStart(
-                            utteranceId: String?
-                        ) {
+        } catch (_: Exception) {
+        }
 
-                            handler.post {
+        try {
 
-                                isSpeaking = true
-                            }
+            tts.setOnUtteranceProgressListener(
+                object : UtteranceProgressListener() {
+
+                    override fun onStart(
+                        utteranceId: String?
+                    ) {
+
+                        handler.post {
+
+                            isSpeaking = true
                         }
+                    }
 
-                        override fun onDone(
-                            utteranceId: String?
-                        ) {
+                    override fun onDone(
+                        utteranceId: String?
+                    ) {
 
-                            handler.post {
+                        handler.post {
 
-                                isSpeaking = false
+                            isSpeaking = false
 
-                                if (!serviceActive) {
-                                    return@post
-                                }
-
-                                if (
-                                    speakThenListenForCommand
-                                ) {
-
-                                    speakThenListenForCommand =
-                                        false
-
-                                    handler.postDelayed(
-                                        {
-                                            if (
-                                                serviceActive &&
-                                                !isSpeaking
-                                            ) {
-                                                startCommandListening()
-                                            }
-                                        },
-                                        150L
-                                    )
-
-                                } else {
-
-                                    scheduleWakeListening(
-                                        AFTER_SPEAK_DELAY
-                                    )
-                                }
+                            if (!serviceActive) {
+                                return@post
                             }
-                        }
 
-                        override fun onError(
-                            utteranceId: String?
-                        ) {
+                            // ------------------------------------
+                            // "HEY JARVIS" -> "JI BOLO"
+                            // -> COMMAND LISTENING
+                            // ------------------------------------
 
-                            handler.post {
+                            if (
+                                speakThenListenForCommand
+                            ) {
 
-                                isSpeaking = false
+                                speakThenListenForCommand =
+                                    false
 
-                                if (!serviceActive) {
-                                    return@post
-                                }
+                                handler.postDelayed(
+                                    {
 
-                                if (
-                                    speakThenListenForCommand
-                                ) {
+                                        if (
+                                            serviceActive &&
+                                            !isSpeaking &&
+                                            waitingForCommand
+                                        ) {
 
-                                    speakThenListenForCommand =
-                                        false
+                                            startCommandListening()
+                                        }
 
-                                    startCommandListening()
+                                    },
+                                    150L
+                                )
 
-                                } else {
+                            } else {
 
-                                    scheduleWakeListening(
-                                        AFTER_SPEAK_DELAY
-                                    )
-                                }
+                                // --------------------------------
+                                // NORMAL REPLY FINISHED
+                                // --------------------------------
+
+                                scheduleWakeWordRestart(
+                                    AFTER_SPEAK_DELAY
+                                )
                             }
                         }
                     }
-                )
 
-            } catch (_: Exception) {
-            }
+                    override fun onError(
+                        utteranceId: String?
+                    ) {
+
+                        handler.post {
+
+                            isSpeaking = false
+
+                            if (!serviceActive) {
+                                return@post
+                            }
+
+                            if (
+                                speakThenListenForCommand
+                            ) {
+
+                                speakThenListenForCommand =
+                                    false
+
+                                waitingForCommand = true
+
+                                startCommandListening()
+
+                            } else {
+
+                                scheduleWakeWordRestart(
+                                    AFTER_SPEAK_DELAY
+                                )
+                            }
+                        }
+                    }
+                }
+            )
+
+        } catch (_: Exception) {
         }
+    }
+
+    // ============================================================
+    // OPEN WAKE WORD START
+    // ============================================================
+
+    private fun startWakeWordDetection() {
+
+        if (!serviceActive) {
+            return
+        }
+
+        if (isSpeaking) {
+            return
+        }
+
+        if (waitingForCommand) {
+            return
+        }
+
+        if (
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+
+            updateNotification(
+                "Microphone permission required"
+            )
+
+            return
+        }
+
+        cancelRecognition()
+
+        updateNotification(
+            "READY • Say Hey Jarvis"
+        )
+
+        try {
+
+            wakeWordEngine?.restart()
+
+        } catch (error: Exception) {
+
+            updateNotification(
+                "Wake word error"
+            )
+
+            handler.postDelayed(
+                {
+
+                    if (serviceActive) {
+                        startWakeWordDetection()
+                    }
+
+                },
+                1000L
+            )
+        }
+    }
+
+    // ============================================================
+    // WAKE WORD DETECTED
+    // ============================================================
+
+    private fun onWakeWordDetected() {
+
+        if (!serviceActive) {
+            return
+        }
+
+        if (isSpeaking) {
+            return
+        }
+
+        if (waitingForCommand) {
+            return
+        }
+
+        // Stop OpenWakeWord BEFORE SpeechRecognizer.
+        try {
+            wakeWordEngine?.stop()
+        } catch (_: Exception) {
+        }
+
+        cancelWakeWordRestart()
+
+        cancelRecognition()
+
+        waitingForCommand = true
+
+        speakThenListenForCommand = true
+
+        updateNotification(
+            "WAKE • Hey Jarvis"
+        )
+
+        speak(
+            "Ji, bolo."
+        )
+
+        startCommandTimeout()
     }
 
     // ============================================================
@@ -328,27 +489,34 @@ class JarvisListenerService : Service(),
                 applicationContext
             )
         ) {
+
             updateNotification(
                 "Speech recognition unavailable"
             )
+
             return
         }
 
         try {
-
             speechRecognizer?.destroy()
-
         } catch (_: Exception) {
         }
 
-        speechRecognizer =
-            SpeechRecognizer.createSpeechRecognizer(
-                applicationContext
+        try {
+
+            speechRecognizer =
+                SpeechRecognizer.createSpeechRecognizer(
+                    applicationContext
+                )
+
+            speechRecognizer?.setRecognitionListener(
+                recognitionListener
             )
 
-        speechRecognizer?.setRecognitionListener(
-            recognitionListener
-        )
+        } catch (_: Exception) {
+
+            speechRecognizer = null
+        }
     }
 
     // ============================================================
@@ -366,41 +534,25 @@ class JarvisListenerService : Service(),
                 recognitionRunning = true
 
                 updateNotification(
-                    if (
-                        listenMode ==
-                        ListenMode.WAKE
-                    ) {
-                        "LISTENING • Say Hey Jarvis"
-                    } else {
-                        "LISTENING • Command"
-                    }
+                    "LISTENING • Command"
                 )
             }
 
             override fun onBeginningOfSpeech() {
 
                 updateNotification(
-                    if (
-                        listenMode ==
-                        ListenMode.WAKE
-                    ) {
-                        "HEARING • Wake word"
-                    } else {
-                        "HEARING • Command"
-                    }
+                    "HEARING • Command"
                 )
             }
 
             override fun onRmsChanged(
                 rmsdB: Float
             ) {
-                // Intentionally empty.
             }
 
             override fun onBufferReceived(
                 buffer: ByteArray?
             ) {
-                // Intentionally empty.
             }
 
             override fun onEndOfSpeech() {
@@ -419,32 +571,26 @@ class JarvisListenerService : Service(),
                     return
                 }
 
-                // --------------------------------------------
-                // USER DID NOT SAY ANYTHING
-                // --------------------------------------------
-
-                if (
-                    listenMode ==
-                    ListenMode.COMMAND &&
-                    waitingForCommand
-                ) {
+                if (waitingForCommand) {
 
                     waitingForCommand = false
 
-                    scheduleWakeListening(
-                        250L
+                    commandTimeoutRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    commandTimeoutRunnable = null
+
+                    scheduleWakeWordRestart(
+                        WAKE_RESTART_DELAY
                     )
 
-                    return
+                } else {
+
+                    scheduleWakeWordRestart(
+                        WAKE_RESTART_DELAY
+                    )
                 }
-
-                // --------------------------------------------
-                // NORMAL WAKE RESTART
-                // --------------------------------------------
-
-                scheduleWakeListening(
-                    RESTART_DELAY
-                )
             }
 
             override fun onResults(
@@ -463,31 +609,24 @@ class JarvisListenerService : Service(),
                         SpeechRecognizer.RESULTS_RECOGNITION
                     )
 
-                if (
-                    matches == null ||
-                    matches.isEmpty()
-                ) {
-
-                    scheduleNextListening()
-
-                    return
-                }
-
-                // SpeechRecognizer usually returns the
-                // best result first.
                 val heard =
-                    matches.firstOrNull()
+                    matches
+                        ?.firstOrNull()
                         ?.trim()
                         ?: ""
 
                 if (heard.isBlank()) {
 
-                    scheduleNextListening()
+                    waitingForCommand = false
+
+                    scheduleWakeWordRestart(
+                        WAKE_RESTART_DELAY
+                    )
 
                     return
                 }
 
-                handleRecognizedSpeech(
+                handleCommandSpeech(
                     heard
                 )
             }
@@ -495,127 +634,51 @@ class JarvisListenerService : Service(),
             override fun onPartialResults(
                 partialResults: android.os.Bundle?
             ) {
-                // We intentionally wait for final result.
             }
 
             override fun onEvent(
                 eventType: Int,
                 params: android.os.Bundle?
             ) {
-                // Intentionally empty.
             }
         }
 
     // ============================================================
-    // HANDLE RECOGNIZED SPEECH
+    // COMMAND SPEECH
     // ============================================================
 
-    private fun handleRecognizedSpeech(
-        heardText: String
+    private fun handleCommandSpeech(
+        heard: String
     ) {
 
         if (!serviceActive) {
             return
         }
 
-        val heard =
-            heardText.trim()
-
-        if (heard.isBlank()) {
-
-            scheduleNextListening()
-
+        if (!waitingForCommand) {
             return
         }
 
-        // ========================================================
-        // COMMAND MODE
-        // ========================================================
+        waitingForCommand = false
 
-        if (waitingForCommand) {
-
-            waitingForCommand = false
-
-            commandTimeoutRunnable?.let {
-                handler.removeCallbacks(it)
-            }
-
-            commandTimeoutRunnable = null
-
-            cancelRecognition()
-
-            val command =
-                cleanCommand(heard)
-
-            if (command.isBlank()) {
-
-                speakThenListenForCommand =
-                    true
-
-                speak(
-                    "Ji, bolo."
-                )
-
-                return
-            }
-
-            updateNotification(
-                "COMMAND • $command"
-            )
-
-            executeCommand(
-                command
-            )
-
-            return
+        commandTimeoutRunnable?.let {
+            handler.removeCallbacks(it)
         }
 
-        // ========================================================
-        // WAKE MODE
-        // ========================================================
+        commandTimeoutRunnable = null
 
-        val afterWake =
-            WakeWordDetector.stripWakeWord(
-                heard
-            )
-
-        // --------------------------------------------------------
-        // NO WAKE WORD
-        // --------------------------------------------------------
-
-        if (afterWake == null) {
-
-            updateNotification(
-                "IGNORED • Waiting for Hey Jarvis"
-            )
-
-            scheduleWakeListening(
-                RESTART_DELAY
-            )
-
-            return
-        }
-
-        // Wake word found.
         cancelRecognition()
 
         val command =
-            cleanCommand(afterWake)
-
-        updateNotification(
-            "WAKE WORD DETECTED"
-        )
-
-        // ========================================================
-        // ONLY "HEY JARVIS"
-        // ========================================================
+            cleanCommand(
+                heard
+            )
 
         if (command.isBlank()) {
 
-            waitingForCommand = false
+            waitingForCommand = true
 
-            speakThenListenForCommand =
-                true
+            speakThenListenForCommand = true
 
             speak(
                 "Ji, bolo."
@@ -625,10 +688,6 @@ class JarvisListenerService : Service(),
 
             return
         }
-
-        // ========================================================
-        // "HEY JARVIS + COMMAND"
-        // ========================================================
 
         updateNotification(
             "COMMAND • $command"
@@ -673,7 +732,7 @@ class JarvisListenerService : Service(),
                 command
             )
 
-        } catch (e: Exception) {
+        } catch (error: Exception) {
 
             updateNotification(
                 "Command error"
@@ -686,48 +745,7 @@ class JarvisListenerService : Service(),
     }
 
     // ============================================================
-    // START WAKE LISTENING
-    // ============================================================
-
-    private fun startWakeListening() {
-
-        if (!serviceActive) {
-            return
-        }
-
-        if (isSpeaking) {
-            return
-        }
-
-        if (
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            updateNotification(
-                "Microphone permission required"
-            )
-
-            return
-        }
-
-        listenMode =
-            ListenMode.WAKE
-
-        waitingForCommand = false
-
-        speakThenListenForCommand =
-            false
-
-        startRecognition(
-            isCommandMode = false
-        )
-    }
-
-    // ============================================================
-    // START COMMAND LISTENING
+    // COMMAND LISTENING
     // ============================================================
 
     private fun startCommandListening() {
@@ -740,6 +758,10 @@ class JarvisListenerService : Service(),
             return
         }
 
+        if (!waitingForCommand) {
+            return
+        }
+
         if (
             ActivityCompat.checkSelfPermission(
                 this,
@@ -754,31 +776,24 @@ class JarvisListenerService : Service(),
             return
         }
 
-        listenMode =
-            ListenMode.COMMAND
-
-        waitingForCommand = true
-
-        startRecognition(
-            isCommandMode = true
-        )
-
-        startCommandTimeout()
+        startRecognition()
     }
 
     // ============================================================
-    // START RECOGNITION
+    // START SPEECH RECOGNITION
     // ============================================================
 
-    private fun startRecognition(
-        isCommandMode: Boolean
-    ) {
+    private fun startRecognition() {
 
         if (!serviceActive) {
             return
         }
 
         if (isSpeaking) {
+            return
+        }
+
+        if (!waitingForCommand) {
             return
         }
 
@@ -790,18 +805,15 @@ class JarvisListenerService : Service(),
             return
         }
 
+        if (speechRecognizer == null) {
+            createSpeechRecognizer()
+        }
+
         val recognizer =
             speechRecognizer
-                ?: run {
-
-                    createSpeechRecognizer()
-
-                    speechRecognizer
-                }
                 ?: return
 
-        recognizerStarting =
-            true
+        recognizerStarting = true
 
         val intent =
             Intent(
@@ -813,6 +825,7 @@ class JarvisListenerService : Service(),
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
                 )
 
+                // Hinglish / Indian English
                 putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE,
                     "en-IN"
@@ -821,11 +834,6 @@ class JarvisListenerService : Service(),
                 putExtra(
                     RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
                     "en-IN"
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE,
-                    false
                 )
 
                 putExtra(
@@ -840,29 +848,17 @@ class JarvisListenerService : Service(),
 
                 putExtra(
                     RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    if (isCommandMode) {
-                        900L
-                    } else {
-                        700L
-                    }
+                    900L
                 )
 
                 putExtra(
                     RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                    if (isCommandMode) {
-                        500L
-                    } else {
-                        500L
-                    }
+                    400L
                 )
 
                 putExtra(
                     RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    if (isCommandMode) {
-                        650L
-                    } else {
-                        600L
-                    }
+                    650L
                 )
             }
 
@@ -874,75 +870,13 @@ class JarvisListenerService : Service(),
 
         } catch (_: Exception) {
 
-            recognizerStarting =
-                false
+            recognizerStarting = false
+            recognitionRunning = false
 
-            recognitionRunning =
-                false
-
-            scheduleWakeListening(
-                500L
+            scheduleWakeWordRestart(
+                700L
             )
         }
-    }
-
-    // ============================================================
-    // SCHEDULE NEXT LISTENING
-    // ============================================================
-
-    private fun scheduleNextListening() {
-
-        if (!serviceActive) {
-            return
-        }
-
-        if (isSpeaking) {
-            return
-        }
-
-        if (
-            listenMode ==
-            ListenMode.COMMAND &&
-            waitingForCommand
-        ) {
-
-            startCommandListening()
-
-        } else {
-
-            scheduleWakeListening(
-                RESTART_DELAY
-            )
-        }
-    }
-
-    // ============================================================
-    // SCHEDULE WAKE LISTENING
-    // ============================================================
-
-    private fun scheduleWakeListening(
-        delay: Long
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        handler.postDelayed(
-            {
-
-                if (
-                    serviceActive &&
-                    !isSpeaking &&
-                    !waitingForCommand
-                ) {
-
-                    startWakeListening()
-                }
-
-            },
-            delay
-        )
     }
 
     // ============================================================
@@ -963,16 +897,18 @@ class JarvisListenerService : Service(),
                     waitingForCommand
                 ) {
 
-                    waitingForCommand =
-                        false
+                    waitingForCommand = false
 
-                    speakThenListenForCommand =
-                        false
+                    speakThenListenForCommand = false
 
                     cancelRecognition()
 
-                    scheduleWakeListening(
-                        250L
+                    updateNotification(
+                        "READY • Say Hey Jarvis"
+                    )
+
+                    scheduleWakeWordRestart(
+                        WAKE_RESTART_DELAY
                     )
                 }
             }
@@ -1005,9 +941,23 @@ class JarvisListenerService : Service(),
 
         if (cleanText.isBlank()) {
 
-            scheduleWakeListening(
-                200L
-            )
+            if (
+                speakThenListenForCommand
+            ) {
+
+                speakThenListenForCommand =
+                    false
+
+                waitingForCommand = true
+
+                startCommandListening()
+
+            } else {
+
+                scheduleWakeWordRestart(
+                    200L
+                )
+            }
 
             return
         }
@@ -1025,11 +975,13 @@ class JarvisListenerService : Service(),
                 speakThenListenForCommand =
                     false
 
+                waitingForCommand = true
+
                 startCommandListening()
 
             } else {
 
-                scheduleWakeListening(
+                scheduleWakeWordRestart(
                     250L
                 )
             }
@@ -1067,11 +1019,13 @@ class JarvisListenerService : Service(),
                 speakThenListenForCommand =
                     false
 
+                waitingForCommand = true
+
                 startCommandListening()
 
             } else {
 
-                scheduleWakeListening(
+                scheduleWakeWordRestart(
                     300L
                 )
             }
@@ -1085,17 +1039,57 @@ class JarvisListenerService : Service(),
     private fun cancelRecognition() {
 
         try {
-
             speechRecognizer?.cancel()
-
         } catch (_: Exception) {
         }
 
-        recognitionRunning =
-            false
+        recognitionRunning = false
+        recognizerStarting = false
+    }
 
-        recognizerStarting =
-            false
+    // ============================================================
+    // WAKE WORD RESTART
+    // ============================================================
+
+    private fun scheduleWakeWordRestart(
+        delay: Long
+    ) {
+
+        if (!serviceActive) {
+            return
+        }
+
+        cancelWakeWordRestart()
+
+        wakeWordRestartRunnable =
+            Runnable {
+
+                if (
+                    serviceActive &&
+                    !isSpeaking &&
+                    !waitingForCommand
+                ) {
+
+                    startWakeWordDetection()
+                }
+            }
+
+        handler.postDelayed(
+            wakeWordRestartRunnable!!,
+            delay
+        )
+    }
+
+    private fun cancelWakeWordRestart() {
+
+        wakeWordRestartRunnable?.let {
+
+            handler.removeCallbacks(
+                it
+            )
+        }
+
+        wakeWordRestartRunnable = null
     }
 
     // ============================================================
@@ -1218,7 +1212,7 @@ class JarvisListenerService : Service(),
     }
 
     // ============================================================
-    // SERVICE BIND
+    // SERVICE
     // ============================================================
 
     override fun onBind(
@@ -1226,10 +1220,6 @@ class JarvisListenerService : Service(),
     ): IBinder? {
         return null
     }
-
-    // ============================================================
-    // START COMMAND
-    // ============================================================
 
     override fun onStartCommand(
         intent: Intent?,
@@ -1239,10 +1229,42 @@ class JarvisListenerService : Service(),
 
         serviceActive = true
 
-        if (
-            speechRecognizer == null
-        ) {
+        if (speechRecognizer == null) {
             createSpeechRecognizer()
+        }
+
+        if (wakeWordEngine == null) {
+
+            wakeWordEngine =
+                JarvisWakeWordEngine(
+                    applicationContext
+                ) {
+
+                    handler.post {
+
+                        if (serviceActive) {
+                            onWakeWordDetected()
+                        }
+                    }
+                }
+        }
+
+        if (
+            !waitingForCommand &&
+            !isSpeaking &&
+            wakeWordEngine?.isRunning() != true
+        ) {
+
+            handler.postDelayed(
+                {
+
+                    if (serviceActive) {
+                        startWakeWordDetection()
+                    }
+
+                },
+                300L
+            )
         }
 
         return START_STICKY
@@ -1256,11 +1278,13 @@ class JarvisListenerService : Service(),
 
         serviceActive = false
 
-        waitingForCommand =
-            false
+        waitingForCommand = false
 
-        speakThenListenForCommand =
-            false
+        speakThenListenForCommand = false
+
+        isSpeaking = false
+
+        cancelWakeWordRestart()
 
         commandTimeoutRunnable?.let {
             handler.removeCallbacks(it)
@@ -1272,10 +1296,7 @@ class JarvisListenerService : Service(),
             null
         )
 
-        try {
-            speechRecognizer?.cancel()
-        } catch (_: Exception) {
-        }
+        cancelRecognition()
 
         try {
             speechRecognizer?.destroy()
@@ -1283,6 +1304,13 @@ class JarvisListenerService : Service(),
         }
 
         speechRecognizer = null
+
+        try {
+            wakeWordEngine?.release()
+        } catch (_: Exception) {
+        }
+
+        wakeWordEngine = null
 
         try {
             tts.stop()
