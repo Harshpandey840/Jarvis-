@@ -35,7 +35,8 @@ import java.util.Locale
 
 class CommandExecutor(
     private val context: Context,
-    private val onSpeak: (String) -> Unit
+    private val onSpeak: (String) -> Unit,
+    private val onFinished: () -> Unit = {}
 ) {
     private val appLauncher = AppLauncher(context)
     private val contactResolver = ContactResolver(context)
@@ -58,11 +59,23 @@ class CommandExecutor(
     private fun runCommand(command: Command) {
         when (command) {
             is Command.OpenApp -> {
-    val opened = appLauncher.openApp(command.appName)
+
+    val opened =
+        appLauncher.openApp(
+            command.appName
+        )
 
     if (!opened) {
-        onSpeak("${command.appName} nahi mila")
+
+        onSpeak(
+            "${command.appName} nahi mila"
+        )
+
+    } else {
+
+        onFinished()
     }
+}
             }
             is Command.SendMessage -> {
                 if (!hasPermission(Manifest.permission.SEND_SMS) || !hasPermission(Manifest.permission.READ_CONTACTS)) {
