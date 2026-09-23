@@ -1,11 +1,18 @@
 package com.user.jarvis
 
+import java.util.Locale
+
 object VoiceCommandProcessor {
 
-    private fun normalize(text: String): String {
-        return text
+    private fun normalize(
+        value: String
+    ): String {
+
+        return value
             .trim()
-            .lowercase()
+            .lowercase(
+                Locale("hi", "IN")
+            )
             .replace(
                 Regex("[^\\p{L}\\p{N}\\s]"),
                 " "
@@ -21,332 +28,401 @@ object VoiceCommandProcessor {
         text: String,
         vararg options: String
     ): Boolean {
+
         return options.any {
             text.contains(it)
         }
     }
 
-    private fun removeWords(
+    private fun stripFillerWords(
         text: String,
-        words: Set<String>
+        fillers: Set<String>
     ): String {
+
         return text
             .split(" ")
             .filter {
                 it.isNotBlank() &&
-                    it !in words
+                        it !in fillers
             }
             .joinToString(" ")
             .trim()
     }
 
-    fun parse(rawInput: String): Command {
+    fun parse(
+        rawInput: String
+    ): Command {
 
-        val norm = normalize(rawInput)
+        val norm =
+            normalize(rawInput)
 
         if (norm.isBlank()) {
-            return Command.Unknown(rawInput)
+            return Command.Unknown(
+                rawInput
+            )
         }
 
-        // =====================================================
+        // ========================================================
         // LOCK PHONE
-        // =====================================================
+        // ========================================================
 
         if (
             containsAny(
                 norm,
+                "lock",
+                "screen lock",
                 "phone lock",
                 "mobile lock",
-                "screen lock",
-                "lock phone",
-                "lock mobile",
-                "lock karo"
+                "फोन लॉक",
+                "स्क्रीन लॉक"
             )
         ) {
+
             return Command.LockPhone
         }
 
-        // =====================================================
-        // FLASHLIGHT
-        // =====================================================
+        // ========================================================
+        // WEATHER
+        // ========================================================
 
         if (
             containsAny(
                 norm,
-                "torch",
-                "flashlight",
-                "flash light"
+                "mausam",
+                "weather",
+                "मौसम"
             )
         ) {
 
-            if (
-                containsAny(
-                    norm,
-                    "off",
-                    "band",
-                    "bandh",
-                    "bujha",
-                    "bujhao"
-                )
-            ) {
-                return Command.FlashlightOff
-            }
+            return Command.GetWeather
+        }
 
-            if (
-                containsAny(
-                    norm,
-                    "on",
-                    "jala",
-                    "jalao",
-                    "chalao",
-                    "karo"
-                )
-            ) {
-                return Command.FlashlightOn
+        // ========================================================
+        // TIME
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "time",
+                "samay",
+                "समय"
+            )
+        ) {
+
+            return Command.TellTime
+        }
+
+        // ========================================================
+        // BATTERY
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "battery",
+                "बैटरी"
+            )
+        ) {
+
+            return Command.TellBattery
+        }
+
+        // ========================================================
+        // SHARE NOTE
+        // ========================================================
+
+        if (
+            norm.contains("share") &&
+            norm.contains("note")
+        ) {
+
+            return Command.ShareNotes
+        }
+
+        // ========================================================
+        // SHARE TODO
+        // ========================================================
+
+        if (
+            norm.contains("share") &&
+            norm.contains("todo")
+        ) {
+
+            return Command.ShareTodos
+        }
+
+        // ========================================================
+        // CONTACT
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "contact banao",
+                "naya contact",
+                "add contact",
+                "contact bana",
+                "contact create"
+            )
+        ) {
+
+            val digits =
+                Regex(
+                    "\\b\\d{8,13}\\b"
+                ).find(norm)
+
+            if (digits != null) {
+
+                val phone =
+                    digits.value
+
+                val namePart =
+                    norm.substring(
+                        0,
+                        digits.range.first
+                    )
+
+                val name =
+                    stripFillerWords(
+                        namePart,
+                        setOf(
+                            "contact",
+                            "banao",
+                            "bana",
+                            "naya",
+                            "add",
+                            "number",
+                            "no",
+                            "ka",
+                            "ke",
+                            "liye",
+                            "name",
+                            "create"
+                        )
+                    )
+
+                if (name.isNotBlank()) {
+
+                    return Command.CreateContact(
+                        name,
+                        phone
+                    )
+                }
             }
         }
 
-        // =====================================================
+        // ========================================================
         // VOLUME
-        // =====================================================
+        // ========================================================
 
-        if (norm.contains("volume")) {
+        if (
+            containsAny(
+                norm,
+                "volume",
+                "awaz",
+                "आवाज",
+                "वॉल्यूम"
+            )
+        ) {
 
             if (
                 containsAny(
                     norm,
                     "badhao",
-                    "badha",
+                    "badha do",
                     "increase",
+                    "tez",
                     "up",
-                    "tez"
+                    "बढ़ाओ"
                 )
             ) {
+
                 return Command.VolumeUp
             }
 
             if (
                 containsAny(
                     norm,
-                    "kam",
+                    "kam karo",
                     "ghatao",
                     "decrease",
-                    "down"
+                    "down",
+                    "कम करो"
                 )
             ) {
+
                 return Command.VolumeDown
             }
         }
 
-        // =====================================================
-        // TIME
-        // =====================================================
+        // ========================================================
+        // FLASHLIGHT
+        // ========================================================
 
         if (
             containsAny(
                 norm,
-                "time",
-                "kitne baje",
-                "kitna baja",
-                "samay"
-            )
-        ) {
-            return Command.TellTime
-        }
-
-        // =====================================================
-        // BATTERY
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "battery",
-                "battery kitni",
-                "charge kitna"
-            )
-        ) {
-            return Command.TellBattery
-        }
-
-        // =====================================================
-        // WEATHER
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "weather",
-                "mausam",
-                "temperature",
-                "barish"
-            )
-        ) {
-            return Command.GetWeather
-        }
-
-        // =====================================================
-        // WIFI
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "wifi",
-                "wi fi"
-            )
-        ) {
-            return Command.OpenWifiSettings
-        }
-
-        // =====================================================
-        // BLUETOOTH
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "bluetooth",
-                "blue tooth"
-            )
-        ) {
-            return Command.OpenBluetoothSettings
-        }
-
-        // =====================================================
-        // SILENT
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "silent mode",
-                "silent",
-                "chup mode"
+                "torch",
+                "flashlight",
+                "flash light",
+                "torch light",
+                "टॉर्च"
             )
         ) {
 
             if (
                 containsAny(
                     norm,
-                    "off",
+                    "bandh",
                     "band",
-                    "sound on"
+                    "off",
+                    "close",
+                    "shut",
+                    "बंद"
                 )
             ) {
-                return Command.SilentModeOff
+
+                return Command.FlashlightOff
             }
+
+            if (
+                containsAny(
+                    norm,
+                    "jalao",
+                    "on",
+                    "chalu",
+                    "चालू",
+                    "जलाओ"
+                )
+            ) {
+
+                return Command.FlashlightOn
+            }
+        }
+
+        // ========================================================
+        // WIFI
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "wifi",
+                "wi fi",
+                "वाईफाई"
+            )
+        ) {
+
+            return Command.OpenWifiSettings
+        }
+
+        // ========================================================
+        // BLUETOOTH
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "bluetooth",
+                "ब्लूटूथ"
+            )
+        ) {
+
+            return Command.OpenBluetoothSettings
+        }
+
+        // ========================================================
+        // SILENT
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "silent",
+                "silent mode",
+                "chup",
+                "साइलेंट"
+            )
+        ) {
 
             return Command.SilentModeOn
         }
 
-        // =====================================================
-        // SEARCH
-        // =====================================================
+        // ========================================================
+        // SOUND ON
+        // ========================================================
 
         if (
             containsAny(
                 norm,
-                "google search",
-                "google pe search",
-                "search karo",
-                "search kar"
+                "sound on",
+                "sound chalu",
+                "ringer on"
             )
         ) {
 
-            val query =
-                norm
-                    .replace("google search", "")
-                    .replace("google pe search", "")
-                    .replace("search karo", "")
-                    .replace("search kar", "")
-                    .replace("search", "")
-                    .trim()
-
-            if (query.isNotBlank()) {
-                return Command.GoogleSearch(query)
-            }
+            return Command.SilentModeOff
         }
 
-        // =====================================================
-        // SONG
-        // =====================================================
-
-        if (
-            containsAny(
-                norm,
-                "song",
-                "gaana",
-                "music"
-            ) &&
-            containsAny(
-                norm,
-                "play",
-                "chalao",
-                "bajao",
-                "chala"
-            )
-        ) {
-
-            val query =
-                removeWords(
-                    norm,
-                    setOf(
-                        "song",
-                        "gaana",
-                        "music",
-                        "play",
-                        "chalao",
-                        "bajao",
-                        "chala",
-                        "karo"
-                    )
-                )
-
-            if (query.isNotBlank()) {
-                return Command.PlaySong(query)
-            }
-        }
-
-        // =====================================================
+        // ========================================================
         // ALARM
-        // =====================================================
+        // ========================================================
 
-        if (norm.contains("alarm")) {
+        if (
+            containsAny(
+                norm,
+                "alarm",
+                "अलार्म"
+            )
+        ) {
 
-            val match =
+            val timeMatch =
                 Regex(
-                    "(\\d{1,2})(?:\\s+(\\d{1,2}))?"
+                    "(\\d{1,2})(?:\\s+(\\d{2}))?"
                 ).find(norm)
 
-            if (match != null) {
+            if (timeMatch != null) {
 
                 var hour =
-                    match.groupValues[1]
+                    timeMatch
+                        .groupValues[1]
                         .toIntOrNull()
                         ?: -1
 
                 val minute =
-                    match.groupValues
-                        .getOrNull(2)
-                        ?.toIntOrNull()
+                    timeMatch
+                        .groupValues[2]
+                        .toIntOrNull()
                         ?: 0
 
-                if (
-                    hour in 0..23 &&
-                    minute in 0..59
-                ) {
+                if (hour in 0..23) {
 
-                    if (
+                    val isPm =
                         containsAny(
                             norm,
                             "raat",
                             "shaam",
                             "evening",
-                            "pm"
-                        ) &&
+                            "night",
+                            "pm",
+                            "रात",
+                            "शाम"
+                        )
+
+                    val isDopahar =
+                        containsAny(
+                            norm,
+                            "dopahar",
+                            "afternoon",
+                            "दोपहर"
+                        )
+
+                    if (
+                        (isPm || isDopahar) &&
                         hour < 12
                     ) {
+
                         hour += 12
                     }
 
@@ -356,23 +432,34 @@ object VoiceCommandProcessor {
                     )
                 }
             }
+
+            return Command.Unknown(
+                rawInput
+            )
         }
 
-        // =====================================================
+        // ========================================================
         // CLIPBOARD
-        // =====================================================
+        // ========================================================
 
-        if (norm.contains("clipboard")) {
+        if (
+            containsAny(
+                norm,
+                "clipboard",
+                "क्लिपबोर्ड"
+            )
+        ) {
 
             if (
                 containsAny(
                     norm,
-                    "read",
                     "padho",
-                    "batao",
-                    "kya hai"
+                    "kya hai",
+                    "read",
+                    "batao"
                 )
             ) {
+
                 return Command.ReadClipboard
             }
 
@@ -380,102 +467,255 @@ object VoiceCommandProcessor {
                 "(likho|copy karo|save karo)\\s+(.+)"
             ).find(norm)?.let {
 
-                return Command.WriteClipboard(
-                    it.groupValues[2].trim()
-                )
+                val text =
+                    it.groupValues[2]
+                        .trim()
+
+                if (text.isNotBlank()) {
+
+                    return Command.WriteClipboard(
+                        text
+                    )
+                }
             }
 
             return Command.ReadClipboard
         }
 
-        // =====================================================
+        // ========================================================
         // TODO
-        // =====================================================
+        // ========================================================
 
-        if (norm.contains("todo")) {
+        if (
+            norm.contains("todo")
+        ) {
 
             if (
                 containsAny(
                     norm,
-                    "read",
                     "padho",
                     "batao",
-                    "list"
+                    "list",
+                    "read"
+                ) &&
+                !containsAny(
+                    norm,
+                    "add",
+                    "likho"
                 )
             ) {
+
                 return Command.ReadTodos
             }
 
             Regex(
-                "(add karo|likho|daalo|add)\\s+(.+)"
+                "(add karo|likho|daalo)\\s+(.+)"
             ).find(norm)?.let {
 
-                return Command.AddTodo(
-                    it.groupValues[2].trim()
-                )
+                val item =
+                    it.groupValues[2]
+                        .trim()
+
+                if (item.isNotBlank()) {
+
+                    return Command.AddTodo(
+                        item
+                    )
+                }
             }
+
+            return Command.ReadTodos
         }
 
-        // =====================================================
-        // NOTE
-        // =====================================================
+        // ========================================================
+        // NOTES
+        // ========================================================
 
-        if (norm.contains("note")) {
+        if (
+            norm.contains("note")
+        ) {
 
             if (
                 containsAny(
                     norm,
-                    "read",
                     "padho",
                     "sunao",
+                    "read",
                     "batao"
                 )
             ) {
+
                 return Command.ReadNotes
             }
 
             Regex(
-                "(likho|save karo|banao|add karo|add)\\s+(.+)"
+                "(likho|save karo|banao|add karo)\\s+(.+)"
             ).find(norm)?.let {
 
-                return Command.SaveNote(
-                    it.groupValues[2].trim()
+                val note =
+                    it.groupValues[2]
+                        .trim()
+
+                if (note.isNotBlank()) {
+
+                    return Command.SaveNote(
+                        note
+                    )
+                }
+            }
+        }
+
+        // ========================================================
+        // SONG
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "gaana",
+                "song",
+                "music",
+                "गाना"
+            ) &&
+            containsAny(
+                norm,
+                "chalao",
+                "play",
+                "bajao",
+                "चलाओ"
+            )
+        ) {
+
+            val query =
+                stripFillerWords(
+                    norm,
+                    setOf(
+                        "gaana",
+                        "song",
+                        "music",
+                        "chalao",
+                        "play",
+                        "bajao",
+                        "karo"
+                    )
+                )
+
+            if (query.isNotBlank()) {
+
+                return Command.PlaySong(
+                    query
                 )
             }
         }
 
-        // =====================================================
-        // WHATSAPP
-        // =====================================================
+        // ========================================================
+        // GOOGLE SEARCH
+        // ========================================================
 
-        if (norm.contains("whatsapp")) {
+        if (
+            containsAny(
+                norm,
+                "search",
+                "google pe search",
+                "google par search"
+            )
+        ) {
+
+            val query =
+                stripFillerWords(
+                    norm,
+                    setOf(
+                        "google",
+                        "pe",
+                        "par",
+                        "search",
+                        "karo",
+                        "kar",
+                        "do",
+                        "for"
+                    )
+                )
+
+            if (query.isNotBlank()) {
+
+                return Command.GoogleSearch(
+                    query
+                )
+            }
+        }
+
+        // ========================================================
+        // WHATSAPP
+        // ========================================================
+
+        if (
+            norm.contains("whatsapp")
+        ) {
 
             val match =
                 Regex(
-                    "whatsapp\\s+(?:par|pe)?\\s*(?:message\\s+)?(.+?)\\s+(?:ko\\s+)?(?:bolo|likho|message karo|send karo|msg karo)\\s+(.+)"
+                    "(bolo|likho|message karo|send karo|kaho|msg karo)\\s+(.+)"
                 ).find(norm)
 
             if (match != null) {
 
-                return Command.SendWhatsApp(
-                    match.groupValues[1].trim(),
-                    match.groupValues[2].trim()
-                )
+                val message =
+                    match.groupValues[2]
+                        .trim()
+
+                val before =
+                    norm.substring(
+                        0,
+                        match.range.first
+                    )
+
+                val name =
+                    stripFillerWords(
+                        before,
+                        setOf(
+                            "whatsapp",
+                            "pe",
+                            "par",
+                            "ko",
+                            "message",
+                            "send",
+                            "to"
+                        )
+                    )
+                        .split(" ")
+                        .filter {
+                            it.isNotBlank()
+                        }
+                        .lastOrNull()
+
+                if (
+                    !name.isNullOrBlank() &&
+                    message.isNotBlank()
+                ) {
+
+                    return Command.SendWhatsApp(
+                        name,
+                        message
+                    )
+                }
             }
         }
 
-        // =====================================================
+        // ========================================================
         // CALL
-        // =====================================================
+        // ========================================================
 
         if (
-            norm.startsWith("call ") ||
-            norm.contains("call karo") ||
-            norm.contains("phone karo")
+            containsAny(
+                norm,
+                "call",
+                "phone",
+                "फोन"
+            )
         ) {
 
             val name =
-                removeWords(
+                stripFillerWords(
                     norm,
                     setOf(
                         "call",
@@ -483,67 +723,84 @@ object VoiceCommandProcessor {
                         "kar",
                         "do",
                         "phone",
+                        "ko",
                         "please",
                         "kripya"
                     )
                 )
 
             if (name.isNotBlank()) {
-                return Command.CallContact(name)
+
+                return Command.CallContact(
+                    name
+                )
             }
         }
 
-        // =====================================================
+        // ========================================================
         // MESSAGE
-        // =====================================================
-
-        Regex(
-            "^(?:message|msg)\\s+(\\w+)\\s+(.+)$"
-        ).find(norm)?.let {
-
-            return Command.SendMessage(
-                it.groupValues[1],
-                it.groupValues[2]
-            )
-        }
-
-        Regex(
-            "(\\w+)\\s+ko\\s+(?:bolo|likho|msg karo|message karo)\\s+(.+)"
-        ).find(norm)?.let {
-
-            return Command.SendMessage(
-                it.groupValues[1],
-                it.groupValues[2]
-            )
-        }
-
-        // =====================================================
-        // OPEN APP
-        // =====================================================
+        // ========================================================
 
         if (
             containsAny(
                 norm,
-                "open ",
+                "message",
+                "msg",
+                "bolo",
+                "likho"
+            ) &&
+            !norm.contains("whatsapp") &&
+            !norm.contains("note") &&
+            !norm.contains("clipboard") &&
+            !norm.contains("todo")
+        ) {
+
+            Regex(
+                "^message\\s+(\\w+)\\s+(.+)$"
+            ).find(norm)?.let {
+
+                return Command.SendMessage(
+                    it.groupValues[1],
+                    it.groupValues[2]
+                )
+            }
+
+            Regex(
+                "(\\w+)\\s+ko\\s+(bolo|likho|msg karo|message karo)\\s+(.+)"
+            ).find(norm)?.let {
+
+                return Command.SendMessage(
+                    it.groupValues[1],
+                    it.groupValues[3]
+                )
+            }
+        }
+
+        // ========================================================
+        // OPEN APP
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
                 "open",
                 "khol",
-                "kholo",
                 "launch",
-                "start"
+                "start",
+                "खोल"
             )
         ) {
 
-            val app =
-                removeWords(
+            val appName =
+                stripFillerWords(
                     norm,
                     setOf(
-                        "open",
                         "khol",
-                        "kholo",
+                        "do",
+                        "open",
                         "launch",
                         "start",
                         "karo",
-                        "do",
                         "please",
                         "kripya",
                         "mera",
@@ -552,64 +809,20 @@ object VoiceCommandProcessor {
                     )
                 )
 
-            if (app.isNotBlank()) {
+            if (appName.isNotBlank()) {
 
                 return Command.OpenApp(
-                    detectAppName(app)
+                    appName
                 )
             }
         }
 
-        return Command.Unknown(rawInput)
-    }
+        // ========================================================
+        // UNKNOWN → AI
+        // ========================================================
 
-    private fun detectAppName(
-        input: String
-    ): String {
-
-        val text = normalize(input)
-
-        return when {
-
-            text == "yt" ||
-                text.contains("youtube") ->
-                "YouTube"
-
-            text == "insta" ||
-                text.contains("instagram") ->
-                "Instagram"
-
-            text.contains("whatsapp") ->
-                "WhatsApp"
-
-            text.contains("chrome") ->
-                "Chrome"
-
-            text == "fb" ||
-                text.contains("facebook") ->
-                "Facebook"
-
-            text.contains("telegram") ->
-                "Telegram"
-
-            text.contains("google maps") ||
-                text == "maps" ->
-                "Google Maps"
-
-            text.contains("play store") ||
-                text.contains("playstore") ->
-                "Play Store"
-
-            text.contains("camera") ||
-                text.contains("cam") ->
-                "Camera"
-
-            text.contains("settings") ||
-                text.contains("setting") ->
-                "Settings"
-
-            else ->
-                input.trim()
-        }
+        return Command.Unknown(
+            rawInput
+        )
     }
 }
