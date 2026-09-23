@@ -58,8 +58,11 @@ class CommandExecutor(
     private fun runCommand(command: Command) {
         when (command) {
             is Command.OpenApp -> {
-                val opened = appLauncher.openApp(command.appName)
-                onSpeak(if (opened) "${command.appName} khol raha hoon" else "${command.appName} nahi mila")
+    val opened = appLauncher.openApp(command.appName)
+
+    if (!opened) {
+        onSpeak("${command.appName} nahi mila")
+    }
             }
             is Command.SendMessage -> {
                 if (!hasPermission(Manifest.permission.SEND_SMS) || !hasPermission(Manifest.permission.READ_CONTACTS)) {
