@@ -33,6 +33,10 @@ class JarvisListenerService : Service(),
         private const val NOTIFICATION_ID =
             1001
 
+        // MainActivity uses this action to stop Jarvis.
+        const val ACTION_STOP =
+            "com.user.jarvis.ACTION_STOP"
+
         private const val COMMAND_TIMEOUT =
             6000L
 
@@ -44,9 +48,6 @@ class JarvisListenerService : Service(),
 
         private const val START_DELAY =
             1000L
-
-        private const val TAG =
-            "JarvisListenerService"
     }
 
     // ============================================================
@@ -57,9 +58,10 @@ class JarvisListenerService : Service(),
         Handler(Looper.getMainLooper())
 
     private var speechRecognizer:
-            SpeechRecognizer? = null
+        SpeechRecognizer? = null
 
-    private lateinit var tts: TextToSpeech
+    private lateinit var tts:
+        TextToSpeech
 
     private var ttsReady =
         false
@@ -87,34 +89,34 @@ class JarvisListenerService : Service(),
     // ============================================================
 
     private var wakeWordEngine:
-            JarvisWakeWordEngine? = null
+        JarvisWakeWordEngine? = null
 
     private var wakeWordRestartRunnable:
-            Runnable? = null
+        Runnable? = null
 
     // ============================================================
     // WAKE LOCK
     // ============================================================
 
     private var wakeLock:
-            PowerManager.WakeLock? = null
+        PowerManager.WakeLock? = null
 
     // ============================================================
     // COMMAND TIMEOUT
     // ============================================================
 
     private var commandTimeoutRunnable:
-            Runnable? = null
+        Runnable? = null
 
     // ============================================================
     // COMMAND EXECUTOR
     // ============================================================
 
     private lateinit var commandExecutor:
-            CommandExecutor
+        CommandExecutor
 
     // ============================================================
-    // START
+    // ON CREATE
     // ============================================================
 
     override fun onCreate() {
@@ -205,14 +207,13 @@ class JarvisListenerService : Service(),
             }
 
         // ========================================================
-        // START
+        // START WAKE WORD
         // ========================================================
 
         handler.postDelayed(
             {
 
                 if (serviceActive) {
-
                     startWakeWordDetection()
                 }
 
@@ -222,7 +223,7 @@ class JarvisListenerService : Service(),
     }
 
     // ============================================================
-    // TTS INIT
+    // TTS INITIALIZATION
     // ============================================================
 
     override fun onInit(
@@ -271,14 +272,14 @@ class JarvisListenerService : Service(),
         try {
 
             tts.setOnUtteranceProgressListener(
-                object : UtteranceProgressListener() {
+                object :
+                    UtteranceProgressListener() {
 
                     override fun onStart(
                         utteranceId: String?
                     ) {
 
                         handler.post {
-
                             isSpeaking = true
                         }
                     }
@@ -295,11 +296,9 @@ class JarvisListenerService : Service(),
                                 return@post
                             }
 
-                            // ------------------------------------
-                            // "HEY JARVIS" -> "JI BOLO"
-                            // -> COMMAND LISTENING
-                            // ------------------------------------
-
+                            // "Hey Jarvis"
+                            // -> "Ji, bolo"
+                            // -> command listening
                             if (
                                 speakThenListenForCommand
                             ) {
@@ -324,10 +323,6 @@ class JarvisListenerService : Service(),
                                 )
 
                             } else {
-
-                                // --------------------------------
-                                // NORMAL REPLY FINISHED
-                                // --------------------------------
 
                                 scheduleWakeWordRestart(
                                     AFTER_SPEAK_DELAY
@@ -375,7 +370,7 @@ class JarvisListenerService : Service(),
     }
 
     // ============================================================
-    // OPEN WAKE WORD START
+    // START OPENWAKEWORD
     // ============================================================
 
     private fun startWakeWordDetection() {
@@ -416,7 +411,7 @@ class JarvisListenerService : Service(),
 
             wakeWordEngine?.restart()
 
-        } catch (error: Exception) {
+        } catch (_: Exception) {
 
             updateNotification(
                 "Wake word error"
@@ -453,7 +448,7 @@ class JarvisListenerService : Service(),
             return
         }
 
-        // Stop OpenWakeWord BEFORE SpeechRecognizer.
+        // Stop OpenWakeWord before SpeechRecognizer.
         try {
             wakeWordEngine?.stop()
         } catch (_: Exception) {
@@ -540,802 +535,4 @@ class JarvisListenerService : Service(),
 
             override fun onBeginningOfSpeech() {
 
-                updateNotification(
-                    "HEARING • Command"
-                )
-            }
-
-            override fun onRmsChanged(
-                rmsdB: Float
-            ) {
-            }
-
-            override fun onBufferReceived(
-                buffer: ByteArray?
-            ) {
-            }
-
-            override fun onEndOfSpeech() {
-
-                recognitionRunning = false
-            }
-
-            override fun onError(
-                error: Int
-            ) {
-
-                recognitionRunning = false
-                recognizerStarting = false
-
-                if (!serviceActive) {
-                    return
-                }
-
-                if (waitingForCommand) {
-
-                    waitingForCommand = false
-
-                    commandTimeoutRunnable?.let {
-                        handler.removeCallbacks(it)
-                    }
-
-                    commandTimeoutRunnable = null
-
-                    scheduleWakeWordRestart(
-                        WAKE_RESTART_DELAY
-                    )
-
-                } else {
-
-                    scheduleWakeWordRestart(
-                        WAKE_RESTART_DELAY
-                    )
-                }
-            }
-
-            override fun onResults(
-                results: android.os.Bundle?
-            ) {
-
-                recognitionRunning = false
-                recognizerStarting = false
-
-                if (!serviceActive) {
-                    return
-                }
-
-                val matches =
-                    results?.getStringArrayList(
-                        SpeechRecognizer.RESULTS_RECOGNITION
-                    )
-
-                val heard =
-                    matches
-                        ?.firstOrNull()
-                        ?.trim()
-                        ?: ""
-
-                if (heard.isBlank()) {
-
-                    waitingForCommand = false
-
-                    scheduleWakeWordRestart(
-                        WAKE_RESTART_DELAY
-                    )
-
-                    return
-                }
-
-                handleCommandSpeech(
-                    heard
-                )
-            }
-
-            override fun onPartialResults(
-                partialResults: android.os.Bundle?
-            ) {
-            }
-
-            override fun onEvent(
-                eventType: Int,
-                params: android.os.Bundle?
-            ) {
-            }
-        }
-
-    // ============================================================
-    // COMMAND SPEECH
-    // ============================================================
-
-    private fun handleCommandSpeech(
-        heard: String
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        if (!waitingForCommand) {
-            return
-        }
-
-        waitingForCommand = false
-
-        commandTimeoutRunnable?.let {
-            handler.removeCallbacks(it)
-        }
-
-        commandTimeoutRunnable = null
-
-        cancelRecognition()
-
-        val command =
-            cleanCommand(
-                heard
-            )
-
-        if (command.isBlank()) {
-
-            waitingForCommand = true
-
-            speakThenListenForCommand = true
-
-            speak(
-                "Ji, bolo."
-            )
-
-            startCommandTimeout()
-
-            return
-        }
-
-        updateNotification(
-            "COMMAND • $command"
-        )
-
-        executeCommand(
-            command
-        )
-    }
-
-    // ============================================================
-    // CLEAN COMMAND
-    // ============================================================
-
-    private fun cleanCommand(
-        command: String
-    ): String {
-
-        return command
-            .trim()
-            .replace(
-                Regex("\\s+"),
-                " "
-            )
-    }
-
-    // ============================================================
-    // EXECUTE COMMAND
-    // ============================================================
-
-    private fun executeCommand(
-        command: String
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        try {
-
-            commandExecutor.execute(
-                command
-            )
-
-        } catch (error: Exception) {
-
-            updateNotification(
-                "Command error"
-            )
-
-            speak(
-                "Command execute nahi ho paya."
-            )
-        }
-    }
-
-    // ============================================================
-    // COMMAND LISTENING
-    // ============================================================
-
-    private fun startCommandListening() {
-
-        if (!serviceActive) {
-            return
-        }
-
-        if (isSpeaking) {
-            return
-        }
-
-        if (!waitingForCommand) {
-            return
-        }
-
-        if (
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            updateNotification(
-                "Microphone permission required"
-            )
-
-            return
-        }
-
-        startRecognition()
-    }
-
-    // ============================================================
-    // START SPEECH RECOGNITION
-    // ============================================================
-
-    private fun startRecognition() {
-
-        if (!serviceActive) {
-            return
-        }
-
-        if (isSpeaking) {
-            return
-        }
-
-        if (!waitingForCommand) {
-            return
-        }
-
-        if (recognizerStarting) {
-            return
-        }
-
-        if (recognitionRunning) {
-            return
-        }
-
-        if (speechRecognizer == null) {
-            createSpeechRecognizer()
-        }
-
-        val recognizer =
-            speechRecognizer
-                ?: return
-
-        recognizerStarting = true
-
-        val intent =
-            Intent(
-                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-            ).apply {
-
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-                )
-
-                // Hinglish / Indian English
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE,
-                    "en-IN"
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                    "en-IN"
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_MAX_RESULTS,
-                    5
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                    true
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    900L
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
-                    400L
-                )
-
-                putExtra(
-                    RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
-                    650L
-                )
-            }
-
-        try {
-
-            recognizer.startListening(
-                intent
-            )
-
-        } catch (_: Exception) {
-
-            recognizerStarting = false
-            recognitionRunning = false
-
-            scheduleWakeWordRestart(
-                700L
-            )
-        }
-    }
-
-    // ============================================================
-    // COMMAND TIMEOUT
-    // ============================================================
-
-    private fun startCommandTimeout() {
-
-        commandTimeoutRunnable?.let {
-            handler.removeCallbacks(it)
-        }
-
-        commandTimeoutRunnable =
-            Runnable {
-
-                if (
-                    serviceActive &&
-                    waitingForCommand
-                ) {
-
-                    waitingForCommand = false
-
-                    speakThenListenForCommand = false
-
-                    cancelRecognition()
-
-                    updateNotification(
-                        "READY • Say Hey Jarvis"
-                    )
-
-                    scheduleWakeWordRestart(
-                        WAKE_RESTART_DELAY
-                    )
-                }
-            }
-
-        handler.postDelayed(
-            commandTimeoutRunnable!!,
-            COMMAND_TIMEOUT
-        )
-    }
-
-    // ============================================================
-    // SPEAK
-    // ============================================================
-
-    private fun speak(
-        text: String
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        val cleanText =
-            text
-                .replace(
-                    Regex("\\*\\*(.*?)\\*\\*"),
-                    "$1"
-                )
-                .trim()
-
-        if (cleanText.isBlank()) {
-
-            if (
-                speakThenListenForCommand
-            ) {
-
-                speakThenListenForCommand =
-                    false
-
-                waitingForCommand = true
-
-                startCommandListening()
-
-            } else {
-
-                scheduleWakeWordRestart(
-                    200L
-                )
-            }
-
-            return
-        }
-
-        cancelRecognition()
-
-        if (!ttsReady) {
-
-            isSpeaking = false
-
-            if (
-                speakThenListenForCommand
-            ) {
-
-                speakThenListenForCommand =
-                    false
-
-                waitingForCommand = true
-
-                startCommandListening()
-
-            } else {
-
-                scheduleWakeWordRestart(
-                    250L
-                )
-            }
-
-            return
-        }
-
-        isSpeaking = true
-
-        updateNotification(
-            "SPEAKING • $cleanText"
-        )
-
-        try {
-
-            val utteranceId =
-                UUID.randomUUID()
-                    .toString()
-
-            tts.speak(
-                cleanText,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                utteranceId
-            )
-
-        } catch (_: Exception) {
-
-            isSpeaking = false
-
-            if (
-                speakThenListenForCommand
-            ) {
-
-                speakThenListenForCommand =
-                    false
-
-                waitingForCommand = true
-
-                startCommandListening()
-
-            } else {
-
-                scheduleWakeWordRestart(
-                    300L
-                )
-            }
-        }
-    }
-
-    // ============================================================
-    // CANCEL RECOGNITION
-    // ============================================================
-
-    private fun cancelRecognition() {
-
-        try {
-            speechRecognizer?.cancel()
-        } catch (_: Exception) {
-        }
-
-        recognitionRunning = false
-        recognizerStarting = false
-    }
-
-    // ============================================================
-    // WAKE WORD RESTART
-    // ============================================================
-
-    private fun scheduleWakeWordRestart(
-        delay: Long
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        cancelWakeWordRestart()
-
-        wakeWordRestartRunnable =
-            Runnable {
-
-                if (
-                    serviceActive &&
-                    !isSpeaking &&
-                    !waitingForCommand
-                ) {
-
-                    startWakeWordDetection()
-                }
-            }
-
-        handler.postDelayed(
-            wakeWordRestartRunnable!!,
-            delay
-        )
-    }
-
-    private fun cancelWakeWordRestart() {
-
-        wakeWordRestartRunnable?.let {
-
-            handler.removeCallbacks(
-                it
-            )
-        }
-
-        wakeWordRestartRunnable = null
-    }
-
-    // ============================================================
-    // WAKE LOCK
-    // ============================================================
-
-    private fun acquireWakeLock() {
-
-        try {
-
-            val powerManager =
-                getSystemService(
-                    POWER_SERVICE
-                ) as PowerManager
-
-            wakeLock =
-                powerManager.newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK,
-                    "Jarvis::VoiceWakeLock"
-                )
-
-            wakeLock?.setReferenceCounted(
-                false
-            )
-
-            wakeLock?.acquire()
-
-        } catch (_: Exception) {
-        }
-    }
-
-    // ============================================================
-    // NOTIFICATION CHANNEL
-    // ============================================================
-
-    private fun createNotificationChannel() {
-
-        if (
-            Build.VERSION.SDK_INT >=
-            Build.VERSION_CODES.O
-        ) {
-
-            val channel =
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "Jarvis Voice Assistant",
-                    NotificationManager.IMPORTANCE_LOW
-                ).apply {
-
-                    description =
-                        "Jarvis background voice assistant"
-
-                    setShowBadge(false)
-                }
-
-            val manager =
-                getSystemService(
-                    NotificationManager::class.java
-                )
-
-            manager.createNotificationChannel(
-                channel
-            )
-        }
-    }
-
-    // ============================================================
-    // NOTIFICATION
-    // ============================================================
-
-    private fun createNotification(
-        text: String
-    ): Notification {
-
-        return NotificationCompat.Builder(
-            this,
-            CHANNEL_ID
-        )
-            .setContentTitle(
-                "Jarvis"
-            )
-            .setContentText(
-                text
-            )
-            .setSmallIcon(
-                android.R.drawable.ic_btn_speak_now
-            )
-            .setOngoing(true)
-            .setCategory(
-                NotificationCompat.CATEGORY_SERVICE
-            )
-            .setPriority(
-                NotificationCompat.PRIORITY_LOW
-            )
-            .build()
-    }
-
-    private fun updateNotification(
-        text: String
-    ) {
-
-        if (!serviceActive) {
-            return
-        }
-
-        try {
-
-            val manager =
-                getSystemService(
-                    NotificationManager::class.java
-                )
-
-            manager.notify(
-                NOTIFICATION_ID,
-                createNotification(text)
-            )
-
-        } catch (_: Exception) {
-        }
-    }
-
-    // ============================================================
-    // SERVICE
-    // ============================================================
-
-    override fun onBind(
-        intent: Intent?
-    ): IBinder? {
-        return null
-    }
-
-    override fun onStartCommand(
-        intent: Intent?,
-        flags: Int,
-        startId: Int
-    ): Int {
-
-        serviceActive = true
-
-        if (speechRecognizer == null) {
-            createSpeechRecognizer()
-        }
-
-        if (wakeWordEngine == null) {
-
-            wakeWordEngine =
-                JarvisWakeWordEngine(
-                    applicationContext
-                ) {
-
-                    handler.post {
-
-                        if (serviceActive) {
-                            onWakeWordDetected()
-                        }
-                    }
-                }
-        }
-
-        if (
-            !waitingForCommand &&
-            !isSpeaking &&
-            wakeWordEngine?.isRunning() != true
-        ) {
-
-            handler.postDelayed(
-                {
-
-                    if (serviceActive) {
-                        startWakeWordDetection()
-                    }
-
-                },
-                300L
-            )
-        }
-
-        return START_STICKY
-    }
-
-    // ============================================================
-    // DESTROY
-    // ============================================================
-
-    override fun onDestroy() {
-
-        serviceActive = false
-
-        waitingForCommand = false
-
-        speakThenListenForCommand = false
-
-        isSpeaking = false
-
-        cancelWakeWordRestart()
-
-        commandTimeoutRunnable?.let {
-            handler.removeCallbacks(it)
-        }
-
-        commandTimeoutRunnable = null
-
-        handler.removeCallbacksAndMessages(
-            null
-        )
-
-        cancelRecognition()
-
-        try {
-            speechRecognizer?.destroy()
-        } catch (_: Exception) {
-        }
-
-        speechRecognizer = null
-
-        try {
-            wakeWordEngine?.release()
-        } catch (_: Exception) {
-        }
-
-        wakeWordEngine = null
-
-        try {
-            tts.stop()
-        } catch (_: Exception) {
-        }
-
-        try {
-            tts.shutdown()
-        } catch (_: Exception) {
-        }
-
-        try {
-
-            wakeLock?.let {
-
-                if (it.isHeld) {
-                    it.release()
-                }
-            }
-
-        } catch (_: Exception) {
-        }
-
-        wakeLock = null
-
-        super.onDestroy()
-    }
-}
+               
