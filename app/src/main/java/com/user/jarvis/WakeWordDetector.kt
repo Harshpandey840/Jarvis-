@@ -1,8 +1,10 @@
 package com.user.jarvis
 
+import java.util.Locale
+
 object WakeWordDetector {
 
-    private val WAKE_VARIANTS = listOf(
+    private val wakePhrases = listOf(
         "hey jarvis",
         "hey jarvish",
         "hey jarwis",
@@ -11,47 +13,52 @@ object WakeWordDetector {
         "jarvish",
         "jarwis",
         "jaarvis",
+        "हे जार्विस",
+        "हे जारविस",
         "जार्विस",
-        "जारविस",
-        "जार्वि"
+        "जारविस"
     )
 
-    /**
-     * Returns:
-     * null  = wake word not detected
-     * ""    = wake word detected but no command followed
-     * text  = wake word detected + command
-     */
     fun stripWakeWord(rawText: String): String? {
-        val original = rawText.trim()
-        if (original.isBlank()) return null
+        val text = normalize(rawText)
 
-        val lower = original.lowercase(LocaleHelper.locale)
+        if (text.isBlank()) return null
 
-        for (variant in WAKE_VARIANTS) {
-            if (lower == variant) {
+        val phrases = wakePhrases
+            .map { normalize(it) }
+            .sortedByDescending { it.length }
+
+        for (phrase in phrases) {
+
+            if (text == phrase) {
                 return ""
             }
 
-            if (lower.startsWith("$variant ")) {
-                return original.substring(variant.length).trim()
-            }
-
-            if (lower.startsWith("$variant,")) {
-                return original.substring(variant.length)
+            if (text.startsWith("$phrase ")) {
+                return text
+                    .removePrefix(phrase)
                     .trim()
-                    .trimStart(',', ':', '-', ' ')
             }
         }
 
         return null
     }
 
-    fun containsWakeWord(rawText: String): Boolean {
+    fun isWakeWord(rawText: String): Boolean {
         return stripWakeWord(rawText) != null
     }
 
-    private object LocaleHelper {
-        val locale = java.util.Locale.ENGLISH
+    private fun normalize(text: String): String {
+        return text
+            .lowercase(Locale("hi", "IN"))
+            .replace(
+                Regex("[^\\p{L}\\p{N}\\s]"),
+                " "
+            )
+            .replace(
+                Regex("\\s+"),
+                " "
+            )
+            .trim()
     }
 }
