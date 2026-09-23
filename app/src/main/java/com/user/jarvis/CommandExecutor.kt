@@ -38,355 +38,1011 @@ class CommandExecutor(
     private val onSpeak: (String) -> Unit,
     private val onFinished: () -> Unit = {}
 ) {
+
     private val appLauncher = AppLauncher(context)
+
     private val contactResolver = ContactResolver(context)
+
     private val messageSender = MessageSender(context)
+
     private val prefs: SharedPreferences =
         context.getSharedPreferences("jarvis_notes", Context.MODE_PRIVATE)
+
     private val httpClient = OkHttpClient()
 
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
+
         if (localCommand !is Command.Unknown) {
             runCommand(localCommand)
         } else {
-            AiCommandParser.parse(spokenText, BuildConfig.GEMINI_API_KEY) { aiCommand ->
+            AiCommandParser.parse(
+                spokenText,
+                BuildConfig.GEMINI_API_KEY
+            ) { aiCommand ->
                 runCommand(aiCommand)
             }
         }
     }
 
     private fun runCommand(command: Command) {
+
         when (command) {
+
             is Command.OpenApp -> {
+                val opened = appLauncher.openApp(command.appName)
 
-    val opened =
-        appLauncher.openApp(
-            command.appName
-        )
-
-    if (!opened) {
-
-        onSpeak(
-            "${command.appName} nahi mila"
-        )
-
-    } else {
-
-        onFinished()
-    }
-}
+                if (opened) {
+                    onFinished()
+                } else {
+                    onSpeak("${command.appName} nahi mila")
+                }
             }
+
             is Command.SendMessage -> {
-                if (!hasPermission(Manifest.permission.SEND_SMS) || !hasPermission(Manifest.permission.READ_CONTACTS)) {
-                    onSpeak("Permission nahi hai message bhejne ki"); return
+
+                if (!hasPermission(Manifest.permission.SEND_SMS) ||
+                    !hasPermission(Manifest.permission.READ_CONTACTS)
+                ) {
+                    onSpeak("Permission nahi hai message bhejne ki")
+                    return
                 }
-                val number = contactResolver.findNumber(command.contactName)
-                if (number == null) { onSpeak("${command.contactName} contact nahi mila"); return }
-                val sent = messageSender.sendSms(number, command.text)
-                onSpeak(if (sent) "${command.contactName} ko message bhej diya" else "Message nahi bhej paya")
+
+                val number =
+                    contactResolver.findNumber(command.contactName)
+
+                if (number == null) {
+                    onSpeak("${command.contactName} contact nahi mila")
+                    return
+                }
+
+                val sent =
+                    messageSender.sendSms(
+                        number,
+                        command.text
+                    )
+
+                if (sent) {
+                    onSpeak("${command.contactName} ko message bhej diya")
+                } else {
+                    onSpeak("Message nahi bhej paya")
+                }
             }
+
             is Command.CallContact -> {
-                if (!hasPermission(Manifest.permission.CALL_PHONE) || !hasPermission(Manifest.permission.READ_CONTACTS)) {
-                    onSpeak("Permission nahi hai call karne ki"); return
+
+                if (!hasPermission(Manifest.permission.CALL_PHONE) ||
+                    !hasPermission(Manifest.permission.READ_CONTACTS)
+                ) {
+                    onSpeak("Permission nahi hai call karne ki")
+                    return
                 }
-                val number = contactResolver.findNumber(command.contactName)
-                if (number == null) { onSpeak("${command.contactName} contact nahi mila"); return }
-                val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                val number =
+                    contactResolver.findNumber(command.contactName)
+
+                if (number == null) {
+                    onSpeak("${command.contactName} contact nahi mila")
+                    return
                 }
-                context.startActivity(callIntent)
-                onSpeak("${command.contactName} ko call kar raha hoon")
-            }
-            is Command.SendWhatsApp -> {
-                if (!hasPermission(Manifest.permission.READ_CONTACTS)) { onSpeak("Permission nahi hai contacts dekhne ki"); return }
-                val number = contactResolver.findNumber(command.contactName)
-                if (number == null) { onSpeak("${command.contactName} contact nahi mila"); return }
-                val cleanNumber = normalizeForWhatsApp(number)
-                val encodedText = URLEncoder.encode(command.text, "UTF-8").replace("+", "%20")
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanNumber?text=$encodedText")).apply {
+
+                val callIntent =
+                    Intent(
+                        Intent.ACTION_CALL,
+                        Uri.parse("tel:$number")
+                    ).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
+
+                context.startActivity(callIntent)
+
+                onSpeak("${command.contactName} ko call kar raha hoon")
+            }
+
+            is Command.SendWhatsApp -> {
+
+                if (!hasPermission(Manifest.permission.READ_CONTACTS)) {
+                    onSpeak("Permission nahi hai contacts dekhne ki")
+                    return
+                }
+
+                val number =
+                    contactResolver.findNumber(command.contactName)
+
+                if (number == null) {
+                    onSpeak("${command.contactName} contact nahi mila")
+                    return
+                }
+
+                val cleanNumber =
+                    normalizeForWhatsApp(number)
+
+                val encodedText =
+                    URLEncoder
+                        .encode(command.text, "UTF-8")
+                        .replace("+", "%20")
+
+                try {
+
+                    val intent =
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(
+                                "https://wa.me/$cleanNumber?text=$encodedText"
+                            )
+                        ).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+
                     context.startActivity(intent)
-                    onSpeak("${command.contactName} ke WhatsApp mein message tayyar hai, Send dabana")
-                } catch (e: Exception) {
+
+                    onSpeak(
+                        "${command.contactName} ke WhatsApp mein message tayyar hai, Send dabana"
+                    )
+
+                } catch (_: Exception) {
                     onSpeak("WhatsApp nahi khul paya")
                 }
             }
+
             is Command.GoogleSearch -> {
-                val encoded = URLEncoder.encode(command.query, "UTF-8")
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$encoded")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-                onSpeak("${command.query} search kar raha hoon")
-            }
-            is Command.PlaySong -> {
-                val encoded = URLEncoder.encode(command.query, "UTF-8")
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=$encoded")).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-                onSpeak("${command.query} bajane ja raha hoon")
-            }
-            is Command.SetAlarm -> {
-                val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
-                    if (command.hour in 0..23) {
-                        putExtra(AlarmClock.EXTRA_HOUR, command.hour)
-                        putExtra(AlarmClock.EXTRA_MINUTES, command.minute.coerceIn(0, 59))
+
+                val encoded =
+                    URLEncoder.encode(command.query, "UTF-8")
+
+                val intent =
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(
+                            "https://www.google.com/search?q=$encoded"
+                        )
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+
+                context.startActivity(intent)
+
+                onSpeak(
+                    "${command.query} search kar raha hoon"
+                )
+            }
+
+            is Command.PlaySong -> {
+
+                val encoded =
+                    URLEncoder.encode(command.query, "UTF-8")
+
+                val intent =
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(
+                            "https://www.youtube.com/results?search_query=$encoded"
+                        )
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                context.startActivity(intent)
+
+                onSpeak(
+                    "${command.query} bajane ja raha hoon"
+                )
+            }
+
+            is Command.SetAlarm -> {
+
+                val intent =
+                    Intent(AlarmClock.ACTION_SET_ALARM).apply {
+
+                        if (command.hour in 0..23) {
+                            putExtra(
+                                AlarmClock.EXTRA_HOUR,
+                                command.hour
+                            )
+
+                            putExtra(
+                                AlarmClock.EXTRA_MINUTES,
+                                command.minute.coerceIn(0, 59)
+                            )
+                        }
+
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
                 try {
+
                     context.startActivity(intent)
-                    onSpeak(if (command.hour in 0..23) "Alarm laga raha hoon" else "Alarm app khol raha hoon, time set kar lena")
-                } catch (e: Exception) {
+
+                    if (command.hour in 0..23) {
+                        onSpeak("Alarm laga raha hoon")
+                    } else {
+                        onSpeak(
+                            "Alarm app khol raha hoon, time set kar lena"
+                        )
+                    }
+
+                } catch (_: Exception) {
                     onSpeak("Alarm nahi laga paya")
                 }
             }
+
             is Command.SetReminder -> {
-                val calendar = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, command.dayOffset)
-                    if (command.hour in 0..23) {
-                        set(Calendar.HOUR_OF_DAY, command.hour)
-                        set(Calendar.MINUTE, command.minute.coerceIn(0, 59))
-                        set(Calendar.SECOND, 0)
+
+                val calendar =
+                    Calendar.getInstance().apply {
+
+                        add(
+                            Calendar.DAY_OF_YEAR,
+                            command.dayOffset
+                        )
+
+                        if (command.hour in 0..23) {
+
+                            set(
+                                Calendar.HOUR_OF_DAY,
+                                command.hour
+                            )
+
+                            set(
+                                Calendar.MINUTE,
+                                command.minute.coerceIn(0, 59)
+                            )
+
+                            set(Calendar.SECOND, 0)
+                        }
                     }
-                }
+
                 if (calendar.timeInMillis <= System.currentTimeMillis()) {
-                    calendar.add(Calendar.DAY_OF_YEAR, 1)
+                    calendar.add(
+                        Calendar.DAY_OF_YEAR,
+                        1
+                    )
                 }
-                scheduleReminder(calendar.timeInMillis, command.text, command.hour, command.minute, command.isRecurring)
-                val timeStr = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()).format(calendar.time)
-                onSpeak(
-                    if (command.isRecurring) "Theek hai, har roz $timeStr ke time yaad dilaunga"
-                    else "Theek hai, $timeStr ko yaad dila dunga"
+
+                scheduleReminder(
+                    calendar.timeInMillis,
+                    command.text,
+                    command.hour,
+                    command.minute,
+                    command.isRecurring
                 )
+
+                val timeStr =
+                    SimpleDateFormat(
+                        "dd MMM, hh:mm a",
+                        Locale.getDefault()
+                    ).format(calendar.time)
+
+                if (command.isRecurring) {
+                    onSpeak(
+                        "Theek hai, har roz $timeStr ke time yaad dilaunga"
+                    )
+                } else {
+                    onSpeak(
+                        "Theek hai, $timeStr ko yaad dila dunga"
+                    )
+                }
             }
+
             is Command.SaveNote -> {
-                val existing = prefs.getStringSet("notes", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+
+                val existing =
+                    prefs.getStringSet(
+                        "notes",
+                        mutableSetOf()
+                    )?.toMutableSet()
+                        ?: mutableSetOf()
+
                 existing.add(command.text)
-                prefs.edit().putStringSet("notes", existing).apply()
+
+                prefs.edit()
+                    .putStringSet("notes", existing)
+                    .apply()
+
                 onSpeak("Note save kar diya")
             }
+
             is Command.AddTodo -> {
-                val existing = prefs.getStringSet("todos", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+
+                val existing =
+                    prefs.getStringSet(
+                        "todos",
+                        mutableSetOf()
+                    )?.toMutableSet()
+                        ?: mutableSetOf()
+
                 existing.add(command.text)
-                prefs.edit().putStringSet("todos", existing).apply()
+
+                prefs.edit()
+                    .putStringSet("todos", existing)
+                    .apply()
+
                 onSpeak("Todo list mein add kar diya")
             }
+
             Command.ReadTodos -> {
-                val todos = prefs.getStringSet("todos", setOf())?.toList() ?: listOf()
-                onSpeak(if (todos.isEmpty()) "Todo list khaali hai" else "Tumhari todo list: " + todos.joinToString(". "))
+
+                val todos =
+                    prefs.getStringSet(
+                        "todos",
+                        setOf()
+                    )?.toList()
+                        ?: emptyList()
+
+                if (todos.isEmpty()) {
+                    onSpeak("Todo list khaali hai")
+                } else {
+                    onSpeak(
+                        "Tumhari todo list: " +
+                            todos.joinToString(". ")
+                    )
+                }
             }
+
             Command.ShareNotes -> {
-                val notes = prefs.getStringSet("notes", setOf())?.toList() ?: listOf()
-                shareText("Mere Notes:\n" + notes.joinToString("\n"))
+
+                val notes =
+                    prefs.getStringSet(
+                        "notes",
+                        setOf()
+                    )?.toList()
+                        ?: emptyList()
+
+                shareText(
+                    "Mere Notes:\n" +
+                        notes.joinToString("\n")
+                )
             }
+
             Command.ShareTodos -> {
-                val todos = prefs.getStringSet("todos", setOf())?.toList() ?: listOf()
-                shareText("Meri Todo List:\n" + todos.joinToString("\n"))
+
+                val todos =
+                    prefs.getStringSet(
+                        "todos",
+                        setOf()
+                    )?.toList()
+                        ?: emptyList()
+
+                shareText(
+                    "Meri Todo List:\n" +
+                        todos.joinToString("\n")
+                )
             }
+
             Command.ReadClipboard -> {
-                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = clipboardManager.primaryClip
+
+                val clipboardManager =
+                    context.getSystemService(
+                        Context.CLIPBOARD_SERVICE
+                    ) as ClipboardManager
+
+                val clip =
+                    clipboardManager.primaryClip
+
                 if (clip != null && clip.itemCount > 0) {
-                    val text = clip.getItemAt(0).coerceToText(context).toString()
-                    onSpeak(if (text.isBlank()) "Clipboard khaali hai" else "Clipboard mein hai: $text")
+
+                    val text =
+                        clip.getItemAt(0)
+                            .coerceToText(context)
+                            .toString()
+
+                    if (text.isBlank()) {
+                        onSpeak("Clipboard khaali hai")
+                    } else {
+                        onSpeak(
+                            "Clipboard mein hai: $text"
+                        )
+                    }
+
                 } else {
                     onSpeak("Clipboard khaali hai")
                 }
             }
+
             is Command.WriteClipboard -> {
-                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboardManager.setPrimaryClip(ClipData.newPlainText("Jarvis", command.text))
+
+                val clipboardManager =
+                    context.getSystemService(
+                        Context.CLIPBOARD_SERVICE
+                    ) as ClipboardManager
+
+                clipboardManager.setPrimaryClip(
+                    ClipData.newPlainText(
+                        "Jarvis",
+                        command.text
+                    )
+                )
+
                 onSpeak("Clipboard mein copy kar diya")
             }
+
             is Command.CreateContact -> {
+
                 try {
-                    val intent = Intent(Intent.ACTION_INSERT).apply {
-                        type = ContactsContract.Contacts.CONTENT_TYPE
-                        putExtra(ContactsContract.Intents.Insert.NAME, command.name)
-                        putExtra(ContactsContract.Intents.Insert.PHONE, command.phone)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+
+                    val intent =
+                        Intent(Intent.ACTION_INSERT).apply {
+
+                            type =
+                                ContactsContract
+                                    .Contacts
+                                    .CONTENT_TYPE
+
+                            putExtra(
+                                ContactsContract.Intents.Insert.NAME,
+                                command.name
+                            )
+
+                            putExtra(
+                                ContactsContract.Intents.Insert.PHONE,
+                                command.phone
+                            )
+
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK
+                            )
+                        }
+
                     context.startActivity(intent)
-                    onSpeak("${command.name} ka contact tayyar kar diya, Save dabana")
-                } catch (e: Exception) {
+
+                    onSpeak(
+                        "${command.name} ka contact tayyar kar diya, Save dabana"
+                    )
+
+                } catch (_: Exception) {
                     onSpeak("Contact nahi bana paya")
                 }
             }
-            Command.GetWeather -> fetchWeatherForCurrentLocation()
-            is Command.ChatReply -> onSpeak(command.text)
+
+            Command.GetWeather -> {
+                fetchWeatherForCurrentLocation()
+            }
+
+            is Command.ChatReply -> {
+                onSpeak(command.text)
+            }
+
             Command.LockPhone -> {
-                val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                val adminComponent = ComponentName(context, JarvisDeviceAdminReceiver::class.java)
+
+                val dpm =
+                    context.getSystemService(
+                        Context.DEVICE_POLICY_SERVICE
+                    ) as DevicePolicyManager
+
+                val adminComponent =
+                    ComponentName(
+                        context,
+                        JarvisDeviceAdminReceiver::class.java
+                    )
+
                 if (dpm.isAdminActive(adminComponent)) {
+
                     onSpeak("Lock kar raha hoon")
+
                     dpm.lockNow()
+
                 } else {
-                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
-                        putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Jarvis ko phone lock karne ke liye ye permission chahiye")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+
+                    val intent =
+                        Intent(
+                            DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN
+                        ).apply {
+
+                            putExtra(
+                                DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                                adminComponent
+                            )
+
+                            putExtra(
+                                DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                                "Jarvis ko phone lock karne ke liye ye permission chahiye"
+                            )
+
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK
+                            )
+                        }
+
                     context.startActivity(intent)
-                    onSpeak("Pehle lock permission allow karo, ek baar hi dena hoga")
+
+                    onSpeak(
+                        "Pehle lock permission allow karo, ek baar hi dena hoga"
+                    )
                 }
             }
+
             Command.ReadNotes -> {
-                val notes = prefs.getStringSet("notes", setOf())?.toList() ?: listOf()
-                onSpeak(if (notes.isEmpty()) "Koi note nahi hai" else "Tumhare notes hain: " + notes.joinToString(". "))
+
+                val notes =
+                    prefs.getStringSet(
+                        "notes",
+                        setOf()
+                    )?.toList()
+                        ?: emptyList()
+
+                if (notes.isEmpty()) {
+                    onSpeak("Koi note nahi hai")
+                } else {
+                    onSpeak(
+                        "Tumhare notes hain: " +
+                            notes.joinToString(". ")
+                    )
+                }
             }
+
             Command.TellTime -> {
-                val time = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+
+                val time =
+                    SimpleDateFormat(
+                        "hh:mm a",
+                        Locale.getDefault()
+                    ).format(Date())
+
                 onSpeak("Abhi time hai $time")
             }
+
             Command.TellBattery -> {
-                val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-                onSpeak("Battery $level percent hai")
+
+                val batteryManager =
+                    context.getSystemService(
+                        Context.BATTERY_SERVICE
+                    ) as BatteryManager
+
+                val level =
+                    batteryManager.getIntProperty(
+                        BatteryManager.BATTERY_PROPERTY_CAPACITY
+                    )
+
+                onSpeak(
+                    "Battery $level percent hai"
+                )
             }
+
             Command.VolumeUp -> {
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+
+                val audioManager =
+                    context.getSystemService(
+                        Context.AUDIO_SERVICE
+                    ) as AudioManager
+
+                audioManager.adjustStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_RAISE,
+                    AudioManager.FLAG_SHOW_UI
+                )
+
                 onSpeak("Volume badha diya")
             }
+
             Command.VolumeDown -> {
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+
+                val audioManager =
+                    context.getSystemService(
+                        Context.AUDIO_SERVICE
+                    ) as AudioManager
+
+                audioManager.adjustStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.ADJUST_LOWER,
+                    AudioManager.FLAG_SHOW_UI
+                )
+
                 onSpeak("Volume kam kar diya")
             }
-            Command.FlashlightOn -> { setTorch(true); onSpeak("Torch jala diya") }
-            Command.FlashlightOff -> { setTorch(false); onSpeak("Torch bandh kar diya") }
+
+            Command.FlashlightOn -> {
+                setTorch(true)
+                onSpeak("Torch jala diya")
+            }
+
+            Command.FlashlightOff -> {
+                setTorch(false)
+                onSpeak("Torch bandh kar diya")
+            }
+
             Command.OpenWifiSettings -> {
-                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-                onSpeak("WiFi settings khol raha hoon")
+
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_WIFI_SETTINGS
+                    ).apply {
+                        addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                        )
+                    }
+                )
+
+                onSpeak(
+                    "WiFi settings khol raha hoon"
+                )
             }
+
             Command.OpenBluetoothSettings -> {
-                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-                onSpeak("Bluetooth settings khol raha hoon")
+
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_BLUETOOTH_SETTINGS
+                    ).apply {
+                        addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                        )
+                    }
+                )
+
+                onSpeak(
+                    "Bluetooth settings khol raha hoon"
+                )
             }
-            Command.SilentModeOn -> setRingerMode(AudioManager.RINGER_MODE_SILENT, "Silent kar diya")
-            Command.SilentModeOff -> setRingerMode(AudioManager.RINGER_MODE_NORMAL, "Sound on kar diya")
-            is Command.Unknown -> onSpeak("Samajh nahi aaya")
+
+            Command.SilentModeOn -> {
+                setRingerMode(
+                    AudioManager.RINGER_MODE_SILENT,
+                    "Silent kar diya"
+                )
+            }
+
+            Command.SilentModeOff -> {
+                setRingerMode(
+                    AudioManager.RINGER_MODE_NORMAL,
+                    "Sound on kar diya"
+                )
+            }
+
+            is Command.Unknown -> {
+                onSpeak("Samajh nahi aaya")
+            }
         }
     }
 
     private fun fetchWeatherForCurrentLocation() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            onSpeak("Location permission nahi hai mausam batane ke liye")
+
+        if (
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            onSpeak(
+                "Location permission nahi hai mausam batane ke liye"
+            )
             return
         }
-        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        val locationManager =
+            context.getSystemService(
+                Context.LOCATION_SERVICE
+            ) as LocationManager
+
         var lat: Double? = null
         var lon: Double? = null
+
         try {
+
             for (provider in locationManager.getProviders(true)) {
-                val loc = locationManager.getLastKnownLocation(provider) ?: continue
+
+                val loc =
+                    locationManager.getLastKnownLocation(
+                        provider
+                    ) ?: continue
+
                 lat = loc.latitude
                 lon = loc.longitude
+
                 break
             }
-        } catch (e: Exception) { }
+
+        } catch (_: Exception) {
+        }
 
         if (lat == null || lon == null) {
-            onSpeak("Location nahi mil paayi, GPS on karke try karo")
+
+            onSpeak(
+                "Location nahi mil paayi, GPS on karke try karo"
+            )
+
             return
         }
 
-        val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true"
+        val url =
+            "https://api.open-meteo.com/v1/forecast" +
+                "?latitude=$lat" +
+                "&longitude=$lon" +
+                "&current_weather=true"
+
         Thread {
+
             try {
-                val request = Request.Builder().url(url).build()
-                httpClient.newCall(request).execute().use { response ->
-                    val json = JSONObject(response.body?.string().orEmpty())
-                    val current = json.getJSONObject("current_weather")
-                    val temp = current.getDouble("temperature")
-                    val code = current.getInt("weathercode")
-                    val description = weatherCodeToText(code)
-                    val message = "Abhi temperature ${temp.toInt()} degree hai, $description"
-                    Handler(Looper.getMainLooper()).post { onSpeak(message) }
+
+                val request =
+                    Request.Builder()
+                        .url(url)
+                        .build()
+
+                httpClient
+                    .newCall(request)
+                    .execute()
+                    .use { response ->
+
+                        val json =
+                            JSONObject(
+                                response.body
+                                    ?.string()
+                                    .orEmpty()
+                            )
+
+                        val current =
+                            json.getJSONObject(
+                                "current_weather"
+                            )
+
+                        val temp =
+                            current.getDouble(
+                                "temperature"
+                            )
+
+                        val code =
+                            current.getInt(
+                                "weathercode"
+                            )
+
+                        val description =
+                            weatherCodeToText(code)
+
+                        val message =
+                            "Abhi temperature " +
+                                "${temp.toInt()} degree hai, " +
+                                description
+
+                        Handler(
+                            Looper.getMainLooper()
+                        ).post {
+                            onSpeak(message)
+                        }
+                    }
+
+            } catch (_: Exception) {
+
+                Handler(
+                    Looper.getMainLooper()
+                ).post {
+                    onSpeak(
+                        "Mausam ka data nahi mil paaya"
+                    )
                 }
-            } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
             }
+
         }.start()
     }
 
-    private fun weatherCodeToText(code: Int): String = when (code) {
-        0 -> "saaf aasmaan hai"
-        1, 2, 3 -> "halke badal hain"
-        45, 48 -> "kohra hai"
-        51, 53, 55 -> "halki boondabaandi hai"
-        61, 63, 65 -> "baarish ho rahi hai"
-        71, 73, 75 -> "baraf gir rahi hai"
-        80, 81, 82 -> "tez baarish ho sakti hai"
-        95, 96, 99 -> "toofan ya aandhi ho sakti hai"
-        else -> "mausam mixed hai"
+    private fun weatherCodeToText(code: Int): String {
+
+        return when (code) {
+
+            0 -> "saaf aasmaan hai"
+
+            1, 2, 3 ->
+                "halke badal hain"
+
+            45, 48 ->
+                "kohra hai"
+
+            51, 53, 55 ->
+                "halki boondabaandi hai"
+
+            61, 63, 65 ->
+                "baarish ho rahi hai"
+
+            71, 73, 75 ->
+                "baraf gir rahi hai"
+
+            80, 81, 82 ->
+                "tez baarish ho sakti hai"
+
+            95, 96, 99 ->
+                "toofan ya aandhi ho sakti hai"
+
+            else ->
+                "mausam mixed hai"
+        }
     }
 
-    private fun scheduleReminder(triggerAtMillis: Long, text: String, hour: Int, minute: Int, isRecurring: Boolean) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val reminderIntent = Intent(context, ReminderReceiver::class.java).apply {
-            putExtra("reminder_text", text)
-            putExtra("is_recurring", isRecurring)
-            putExtra("reminder_hour", hour)
-            putExtra("reminder_minute", minute)
-        }
-        val requestCode = System.currentTimeMillis().toInt()
-        val pendingIntent = PendingIntent.getBroadcast(
-            context, requestCode, reminderIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    private fun scheduleReminder(
+        triggerAtMillis: Long,
+        text: String,
+        hour: Int,
+        minute: Int,
+        isRecurring: Boolean
+    ) {
+
+        val alarmManager =
+            context.getSystemService(
+                Context.ALARM_SERVICE
+            ) as AlarmManager
+
+        val reminderIntent =
+            Intent(
+                context,
+                ReminderReceiver::class.java
+            ).apply {
+
+                putExtra(
+                    "reminder_text",
+                    text
+                )
+
+                putExtra(
+                    "is_recurring",
+                    isRecurring
+                )
+
+                putExtra(
+                    "reminder_hour",
+                    hour
+                )
+
+                putExtra(
+                    "reminder_minute",
+                    minute
+                )
+            }
+
+        val requestCode =
+            System.currentTimeMillis().toInt()
+
+        val pendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                reminderIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE
+            )
+
+        alarmManager.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            triggerAtMillis,
+            pendingIntent
         )
-        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
     }
 
     private fun shareText(text: String) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
+
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+
+                type = "text/plain"
+
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    text
+                )
+
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+                )
+            }
+
         try {
-            context.startActivity(Intent.createChooser(intent, "Share karo").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            })
-            onSpeak("Share karne ka option khol raha hoon")
-        } catch (e: Exception) {
-            onSpeak("Share nahi kar paya")
+
+            context.startActivity(
+                Intent.createChooser(
+                    intent,
+                    "Share karo"
+                ).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                    )
+                }
+            )
+
+            onSpeak(
+                "Share karne ka option khol raha hoon"
+            )
+
+        } catch (_: Exception) {
+
+            onSpeak(
+                "Share nahi kar paya"
+            )
         }
     }
 
-    private fun setRingerMode(mode: Int, successMessage: String) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (!notificationManager.isNotificationPolicyAccessGranted) {
-            val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+    private fun setRingerMode(
+        mode: Int,
+        successMessage: String
+    ) {
+
+        val notificationManager =
+            context.getSystemService(
+                Context.NOTIFICATION_SERVICE
+            ) as NotificationManager
+
+        if (
+            !notificationManager
+                .isNotificationPolicyAccessGranted
+        ) {
+
+            val intent =
+                Intent(
+                    Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS
+                ).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                    )
+                }
+
             context.startActivity(intent)
-            onSpeak("Pehle Jarvis ko 'Do Not Disturb' permission do")
+
+            onSpeak(
+                "Pehle Jarvis ko 'Do Not Disturb' permission do"
+            )
+
             return
         }
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        val audioManager =
+            context.getSystemService(
+                Context.AUDIO_SERVICE
+            ) as AudioManager
+
         audioManager.ringerMode = mode
+
         onSpeak(successMessage)
     }
 
     private fun setTorch(on: Boolean) {
+
         try {
-            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-            val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
-                cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+
+            val cameraManager =
+                context.getSystemService(
+                    Context.CAMERA_SERVICE
+                ) as CameraManager
+
+            val cameraId =
+                cameraManager.cameraIdList.firstOrNull { id ->
+
+                    cameraManager
+                        .getCameraCharacteristics(id)
+                        .get(
+                            CameraCharacteristics.FLASH_INFO_AVAILABLE
+                        ) == true
+                }
+
+            if (cameraId != null) {
+                cameraManager.setTorchMode(
+                    cameraId,
+                    on
+                )
             }
-            if (cameraId != null) cameraManager.setTorchMode(cameraId, on)
-        } catch (e: Exception) { }
+
+        } catch (_: Exception) {
+        }
     }
 
-    private fun normalizeForWhatsApp(rawNumber: String): String {
-        val digitsOnly = rawNumber.filter { it.isDigit() }
-        return if (digitsOnly.length == 10) "91$digitsOnly" else digitsOnly
+    private fun normalizeForWhatsApp(
+        rawNumber: String
+    ): String {
+
+        val digitsOnly =
+            rawNumber.filter {
+                it.isDigit()
+            }
+
+        return if (digitsOnly.length == 10) {
+            "91$digitsOnly"
+        } else {
+            digitsOnly
+        }
     }
 
-    private fun hasPermission(permission: String) =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    private fun hasPermission(
+        permission: String
+    ): Boolean {
+
+        return ContextCompat.checkSelfPermission(
+            context,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 }
