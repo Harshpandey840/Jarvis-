@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.media.AudioManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -103,6 +104,12 @@ class JarvisListenerService : Service(), TextToSpeech.OnInitListener {
 
     private fun startListeningCycle() {
         if (!isServiceActive || isSpeaking) return
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (audioManager.isMusicActive) {
+            updateNotification("Media chal raha hai, thoda ruka hoon")
+            handler.postDelayed({ startListeningCycle() }, 4000L)
+            return
+        }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
