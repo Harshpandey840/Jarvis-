@@ -2,9 +2,7 @@ package com.user.jarvis
 
 import android.content.Context
 import android.util.Log
-import com.rementia.openwakeword.lib.DetectionMode
 import com.rementia.openwakeword.lib.WakeWordEngine
-import com.rementia.openwakeword.lib.WakeWordModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,20 +16,34 @@ class JarvisWakeWordEngine(
 ) {
 
     companion object {
-        private const val TAG = "JarvisWakeWord"
 
-        private const val MODEL_NAME = "Hey Jarvis"
-        private const val MODEL_FILE = "hey_jarvis.onnx"
+        private const val TAG =
+            "JarvisWakeWord"
 
-        private const val THRESHOLD = 0.10f
-        private const val COOLDOWN_MS = 2000L
+        private const val MODEL_NAME =
+            "Hey Jarvis"
+
+        private const val MODEL_FILE =
+            "hey_jarvis.onnx"
+
+        private const val THRESHOLD =
+            0.10f
+
+        private const val COOLDOWN_MS =
+            2000L
     }
 
     private val scope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        CoroutineScope(
+            SupervisorJob() +
+                    Dispatchers.Default
+        )
 
-    private var engine: WakeWordEngine? = null
-    private var detectionJob: Job? = null
+    private var engine:
+            WakeWordEngine? = null
+
+    private var detectionJob:
+            Job? = null
 
     @Volatile
     private var running = false
@@ -47,61 +59,66 @@ class JarvisWakeWordEngine(
 
             if (engine == null) {
 
-                val models = listOf(
-                    WakeWordModel(
-                        name = MODEL_NAME,
-                        modelPath = MODEL_FILE,
-                        threshold = THRESHOLD
+                /*
+                 * OpenWakeWord 0.1.5
+                 *
+                 * Model configuration is handled
+                 * by the engine/library.
+                 */
+                engine =
+                    WakeWordEngine(
+                        context = context,
+                        models = emptyList(),
+                        detectionCooldownMs =
+                            COOLDOWN_MS
                     )
-                )
-
-                engine = WakeWordEngine(
-                    context = context,
-                    models = models,
-                    detectionMode = DetectionMode.SINGLE_BEST,
-                    detectionCooldownMs = COOLDOWN_MS
-                )
             }
 
             detectionJob?.cancel()
 
-            detectionJob = scope.launch {
+            detectionJob =
+                scope.launch {
 
-                engine!!
-                    .detections
-                    .catch { error ->
+                    engine!!
+                        .detections
+                        .catch { error ->
 
-                        Log.e(
-                            TAG,
-                            "Wake word detection error",
-                            error
-                        )
+                            Log.e(
+                                TAG,
+                                "Wake word detection error",
+                                error
+                            )
 
-                        running = false
-                    }
-                    .collect { detection ->
+                            running = false
+                        }
+                        .collect { detection ->
 
-                        Log.d(
-                            TAG,
-                            "Detected ${detection.model.name} score=${detection.score}"
-                        )
+                            Log.d(
+                                TAG,
+                                "Detection: ${detection.model.name} " +
+                                        "score=${detection.score}"
+                            )
 
-                        if (
-                            detection.model.name == MODEL_NAME &&
-                            !processingWake
-                        ) {
+                            if (
+                                detection.model.name ==
+                                MODEL_NAME &&
+                                !processingWake
+                            ) {
 
-                            processingWake = true
+                                processingWake =
+                                    true
 
-                            launch(Dispatchers.Main) {
+                                launch(
+                                    Dispatchers.Main
+                                ) {
 
-                                if (running) {
-                                    onWakeWord()
+                                    if (running) {
+                                        onWakeWord()
+                                    }
                                 }
                             }
                         }
-                    }
-            }
+                }
 
             engine?.start()
 
@@ -142,11 +159,6 @@ class JarvisWakeWordEngine(
         }
 
         running = false
-
-        Log.d(
-            TAG,
-            "OpenWakeWord stopped"
-        )
     }
 
     fun restart() {
@@ -179,14 +191,10 @@ class JarvisWakeWordEngine(
         running = false
 
         processingWake = false
-
-        Log.d(
-            TAG,
-            "OpenWakeWord released"
-        )
     }
 
     fun isRunning(): Boolean {
+
         return running
     }
 }
