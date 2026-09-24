@@ -657,25 +657,16 @@ class JarvisListenerService : Service() {
     ) {
 
         val command =
-            try {
-                VoiceCommandProcessor.parse(
-                    text
-                )
-            } catch (_: Exception) {
-                Command.Unknown(text)
-            }
+        private fun executeCommand(text: String) {
 
-        try {
+    try {
 
-            commandExecutor?.execute(
-                command
-            )
+        commandExecutor?.execute(text)
 
-        } catch (_: Exception) {
+    } catch (_: Exception) {
 
-            speak(
-                "Command execute nahi ho paya."
-            )
+        speak("Command execute nahi ho paya.")
+    }
         }
     }
 
