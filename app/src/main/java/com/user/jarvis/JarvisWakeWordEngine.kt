@@ -3,7 +3,6 @@ package com.user.jarvis
 import android.content.Context
 import android.util.Log
 import com.rementia.openwakeword.lib.WakeWordEngine
-import com.rementia.openwakeword.lib.WakeWordModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,12 +17,6 @@ class JarvisWakeWordEngine(
 
     companion object {
         private const val TAG = "JarvisWakeWord"
-
-        private const val MODEL_NAME = "Hey Jarvis"
-        private const val MODEL_FILE = "hey_jarvis.onnx"
-
-        private const val THRESHOLD = 0.10f
-        private const val COOLDOWN_MS = 2000L
     }
 
     private val scope =
@@ -48,18 +41,8 @@ class JarvisWakeWordEngine(
 
             if (engine == null) {
 
-                val models = listOf(
-                    WakeWordModel(
-                        name = MODEL_NAME,
-                        modelPath = MODEL_FILE,
-                        threshold = THRESHOLD
-                    )
-                )
-
                 engine = WakeWordEngine(
-                    context = context,
-                    models = models,
-                    detectionCooldownMs = COOLDOWN_MS
+                    context = context
                 )
             }
 
@@ -83,14 +66,12 @@ class JarvisWakeWordEngine(
 
                         Log.d(
                             TAG,
-                            "Detected: ${detection.model.name}, " +
+                            "Wake word detected: " +
+                                    "${detection.model.name} " +
                                     "score=${detection.score}"
                         )
 
-                        if (
-                            detection.model.name == MODEL_NAME &&
-                            !processingWake
-                        ) {
+                        if (!processingWake) {
 
                             processingWake = true
 
@@ -113,30 +94,28 @@ class JarvisWakeWordEngine(
                 "OpenWakeWord started"
             )
 
-        } catch (error: Exception) {
+        } catch (e: Exception) {
 
             running = false
 
             Log.e(
                 TAG,
                 "OpenWakeWord start failed",
-                error
+                e
             )
         }
     }
 
     fun stop() {
 
-        if (!running) return
-
         try {
             engine?.stop()
-        } catch (error: Exception) {
+        } catch (e: Exception) {
 
             Log.e(
                 TAG,
                 "OpenWakeWord stop failed",
-                error
+                e
             )
         }
 
@@ -155,6 +134,7 @@ class JarvisWakeWordEngine(
     fun release() {
 
         detectionJob?.cancel()
+
         detectionJob = null
 
         try {
@@ -170,6 +150,7 @@ class JarvisWakeWordEngine(
         engine = null
 
         running = false
+
         processingWake = false
     }
 
