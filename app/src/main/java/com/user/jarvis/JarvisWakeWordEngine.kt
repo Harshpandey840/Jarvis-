@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
@@ -24,17 +23,12 @@ class JarvisWakeWordEngine(
         private const val MODEL_NAME = "Hey Jarvis"
         private const val MODEL_FILE = "hey_jarvis.onnx"
 
-        // Starting threshold.
-        // Agar false detection zyada ho to 0.15 / 0.20 try kar sakte ho.
         private const val THRESHOLD = 0.10f
-
         private const val COOLDOWN_MS = 2000L
     }
 
     private val scope =
-        CoroutineScope(
-            SupervisorJob() + Dispatchers.Default
-        )
+        CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var engine: WakeWordEngine? = null
     private var detectionJob: Job? = null
@@ -135,7 +129,9 @@ class JarvisWakeWordEngine(
         if (!running) return
 
         try {
+
             engine?.stop()
+
         } catch (error: Exception) {
 
             Log.e(
@@ -165,6 +161,7 @@ class JarvisWakeWordEngine(
     fun release() {
 
         detectionJob?.cancel()
+
         detectionJob = null
 
         try {
@@ -180,6 +177,7 @@ class JarvisWakeWordEngine(
         engine = null
 
         running = false
+
         processingWake = false
 
         Log.d(
