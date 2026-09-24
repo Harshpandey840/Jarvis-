@@ -99,7 +99,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
 
-        commandExecutor = CommandExecutor(this) { speak(it) }
+      commandExecutor = CommandExecutor(
+    this,
+    { text -> speak(text) }
+)  
 
         tts = TextToSpeech(this, this)
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
