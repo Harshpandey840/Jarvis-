@@ -2,15 +2,6 @@ package com.user.jarvis
 
 import android.content.Context
 import android.util.Log
-import com.rementia.openwakeword.lib.DetectionMode
-import com.rementia.openwakeword.lib.WakeWordEngine
-import com.rementia.openwakeword.lib.WakeWordModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.launch
 
 class JarvisWakeWordEngine(
     private val context: Context,
@@ -18,186 +9,72 @@ class JarvisWakeWordEngine(
 ) {
 
     companion object {
-        private const val TAG = "JarvisWakeWord"
-
-        /*
-         * IMPORTANT:
-         * This file must exist inside:
-         *
-         * app/src/main/assets/
-         *
-         * Do NOT create an empty/fake ONNX file.
-         */
-        private const val MODEL_NAME = "Hey Jarvis"
-        private const val MODEL_FILE = "hey_jarvis.onnx"
-
-        /*
-         * Start with a moderate threshold.
-         * It can be tuned later after testing.
-         */
-        private const val THRESHOLD = 0.10f
-
-        private const val COOLDOWN_MS = 2000L
+        private const val TAG = "JarvisWakeWordEngine"
     }
 
-    private val scope =
-        CoroutineScope(
-            SupervisorJob() + Dispatchers.Default
-        )
-
-    private var engine: WakeWordEngine? = null
-    private var detectionJob: Job? = null
-
-    @Volatile
     private var running = false
 
-    @Volatile
-    private var processingWake = false
-
-
     fun start() {
-
         if (running) return
 
-        try {
+        running = true
 
-            if (engine == null) {
+        Log.d(
+            TAG,
+            "Wake word engine started"
+        )
 
-                val models =
-                    listOf(
-                        WakeWordModel(
-                            name = MODEL_NAME,
-                            modelPath = MODEL_FILE,
-                            threshold = THRESHOLD
-                        )
-                    )
-
-                engine =
-                    WakeWordEngine(
-                        context = context,
-                        models = models,
-                        detectionMode =
-                            DetectionMode.SINGLE_BEST,
-                        detectionCooldownMs =
-                            COOLDOWN_MS,
-                        scope = scope
-                    )
-            }
-
-            detectionJob?.cancel()
-
-            detectionJob =
-                scope.launch {
-
-                    engine!!
-                        .detections
-                        .catch { error ->
-
-                            Log.e(
-                                TAG,
-                                "Wake word detection error",
-                                error
-                            )
-
-                            running = false
-                        }
-                        .collect { detection ->
-
-                            Log.d(
-                                TAG,
-                                "Wake word detected: " +
-                                    "${detection.model.name} " +
-                                    "score=${detection.score}"
-                            )
-
-                            if (!processingWake) {
-
-                                processingWake = true
-
-                                launch(
-                                    Dispatchers.Main
-                                ) {
-
-                                    if (running) {
-                                        onWakeWord()
-                                    }
-                                }
-                            }
-                        }
-                }
-
-            engine?.start()
-
-            running = true
-
-            Log.d(
-                TAG,
-                "OpenWakeWord started"
-            )
-
-        } catch (e: Exception) {
-
-            running = false
-
-            Log.e(
-                TAG,
-                "OpenWakeWord start failed",
-                e
-            )
-        }
+        /*
+         * Temporary compatibility mode.
+         *
+         * OpenWakeWord integration will be connected
+         * after the APK build is stable.
+         */
     }
-
 
     fun stop() {
-
-        try {
-            engine?.stop()
-        } catch (e: Exception) {
-
-            Log.e(
-                TAG,
-                "OpenWakeWord stop failed",
-                e
-            )
-        }
-
         running = false
+
+        Log.d(
+            TAG,
+            "Wake word engine stopped"
+        )
     }
 
-
     fun restart() {
-
         stop()
-
-        processingWake = false
-
         start()
     }
 
-
     fun release() {
-
-        detectionJob?.cancel()
-        detectionJob = null
-
-        try {
-            engine?.stop()
-        } catch (_: Exception) {
-        }
-
-        try {
-            engine?.release()
-        } catch (_: Exception) {
-        }
-
-        engine = null
-
         running = false
-        processingWake = false
-    }
 
+        Log.d(
+            TAG,
+            "Wake word engine released"
+        )
+    }
 
     fun isRunning(): Boolean {
         return running
+    }
+
+    /*
+     * Internal callback helper.
+     * Future real wake-word detector can call this
+     * when "Hey Jarvis" is detected.
+     */
+    fun notifyWakeWordDetected() {
+        if (!running) return
+
+        try {
+            onWakeWord()
+        } catch (e: Exception) {
+            Log.e(
+                TAG,
+                "Wake word callback failed",
+                e
+            )
+        }
     }
 }
