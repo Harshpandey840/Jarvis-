@@ -64,10 +64,18 @@ class JarvisListenerService : Service() {
 
         createNotificationChannel()
 
-        startForeground(
-            NOTIFICATION_ID,
-            createNotification("Jarvis starting...")
-        )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Jarvis starting..."),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Jarvis starting...")
+            )
+        }
 
         acquireWakeLock()
 
