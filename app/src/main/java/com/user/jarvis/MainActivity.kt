@@ -458,7 +458,14 @@ override fun onResume() {
         override fun onError(error: Int) { stateLabel.text = "Samajh nahi aaya, phir bolo" }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
-        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onRmsChanged(rmsdB: Float) {
+            val scale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.5f
+            findViewById<View>(R.id.micButton).animate()
+                .scaleX(scale)
+                .scaleY(scale)
+                .setDuration(50)
+                .start()
+        }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
         override fun onPartialResults(partialResults: Bundle?) {}

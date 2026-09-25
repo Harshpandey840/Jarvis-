@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <issue id="UnsafeOptInUsageError" severity="warning" />
+    <issue id="PermissionImpliesUnsupportedChromeOsHardware" severity="warning" />
+    <issue id="SuspiciousIndentation" severity="warning" />
+</lint>

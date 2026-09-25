@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.content.pm.ServiceInfo
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -64,10 +65,18 @@ class JarvisListenerService : Service() {
 
         createNotificationChannel()
 
-        startForeground(
-            NOTIFICATION_ID,
-            createNotification("Jarvis starting...")
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Jarvis starting..."),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(
+                NOTIFICATION_ID,
+                createNotification("Jarvis starting...")
+            )
+        }
 
         acquireWakeLock()
 
