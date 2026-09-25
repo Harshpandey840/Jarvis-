@@ -83,7 +83,7 @@ object WakeWordDetector {
                 Locale("hi", "IN")
             )
             .replace(
-                Regex("[^\\p{L}\\p{N}\\s]"),
+                Regex("[^\\p{L}\\p{M}\\p{N}\\s]"),
                 " "
             )
             .replace(
