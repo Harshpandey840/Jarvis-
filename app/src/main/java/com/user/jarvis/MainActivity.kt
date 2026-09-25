@@ -38,6 +38,8 @@ import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.collect
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -275,29 +277,29 @@ override fun onResume() {
     // ---------- Orb pulse animation ----------
 
     private fun setupPulseAnimation() {
-        pulseView(findViewById(R.id.pulseRingOuter), 0L)
-        pulseView(findViewById(R.id.pulseRingInner), 800L)
-    }
+        val outerRing = findViewById<View>(R.id.pulseRingOuter)
+        val innerRing = findViewById<View>(R.id.pulseRingInner)
 
-    private fun pulseView(view: View, delay: Long) {
-        view.alpha = 0f
-        val scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
+        lifecycleScope.launchWhenStarted {
+            JarvisWakeWordEngine.rmsFlow.collect { rms ->
+                val scale = 1f + (rms / 1000f).coerceIn(0f, 1.5f)
+
+                outerRing.animate()
+                    .scaleX(scale)
+                    .scaleY(scale)
+                    .setDuration(50)
+                    .start()
+
+                val innerScale = 1f + (rms / 1500f).coerceIn(0f, 1.0f)
+                innerRing.animate()
+                    .scaleX(innerScale)
+                    .scaleY(innerScale)
+                    .setDuration(50)
+                    .start()
+            }
         }
-        val scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.55f, 0f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        AnimatorSet().apply {
-            playTogether(scaleX, scaleY, alpha)
-            duration = 1700
-            startDelay = delay
-            interpolator = LinearInterpolator()
-            start()
-        }
-    }// ---------- PIN lock + intruder security ----------
+    }
+    // ---------- PIN lock + intruder security ----------
 
     private fun lockUiUntilPinVerified() {
         micButton.isEnabled = false

@@ -1,17 +1,17 @@
 package com.user.jarvis
 
 import android.content.Context
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.util.Log
-import com.rementia.openwakeword.lib.WakeWordEngine
-import com.rementia.openwakeword.lib.model.DetectionMode
-import com.rementia.openwakeword.lib.model.WakeWordModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
+import kotlin.math.sqrt
 
 class JarvisWakeWordEngine(
     private val context: Context,
@@ -20,67 +20,118 @@ class JarvisWakeWordEngine(
 
     companion object {
         private const val TAG = "JarvisWakeWordEngine"
+        val rmsFlow = MutableStateFlow(0f)
     }
 
     private var running = false
-    private var engine: WakeWordEngine? = null
-    private var engineScope: CoroutineScope? = null
+    private var audioScope: CoroutineScope? = null
 
-    private fun copyModelsToFilesDir() {
-        val models = listOf("hey_jarvis_v0.1.onnx", "melspectrogram.onnx", "embedding_model.onnx")
-        for (model in models) {
-            val file = File(context.filesDir, model)
-            if (!file.exists()) {
-                context.assets.open(model).use { inputStream ->
-                    file.outputStream().use { outputStream ->
-                        inputStream.copyTo(outputStream)
-                    }
-                }
-            }
-        }
-    }
+    // Internal processor tracking via reflection
+    private var audioProcessorInstance: Any? = null
+    private var onnxRunnerInstance: Any? = null
+    private var predictMethod: java.lang.reflect.Method? = null
+
+    private var lastDetectionTime = 0L
 
     fun start() {
         if (running) return
         running = true
 
-        Log.d(TAG, "Wake word engine starting")
+        Log.d(TAG, "Wake word engine starting via Reflection")
 
-        engineScope = CoroutineScope(Dispatchers.Default + Job())
+        audioScope = CoroutineScope(Dispatchers.IO + Job())
 
-        engineScope?.launch {
-            withContext(Dispatchers.IO) {
-                copyModelsToFilesDir()
-            }
+        audioScope?.launch {
+            try {
+                // Read OpenWakeWord SDK constants via Reflection
+                val audioRecorderClass = Class.forName("com.rementia.openwakeword.lib.audio.AudioRecorder")
+                val sampleRate = audioRecorderClass.getField("SAMPLE_RATE").getInt(null)
+                val channelConfig = audioRecorderClass.getField("CHANNEL_CONFIG").getInt(null)
+                val audioFormat = audioRecorderClass.getField("AUDIO_FORMAT").getInt(null)
+                val bufferSizeInShorts = audioRecorderClass.getField("BUFFER_SIZE_IN_SHORTS").getInt(null)
 
-            if (!running) return@launch
+                // Initialize OpenWakeWord SDK manually via Reflection
+                val onnxRunnerClass = Class.forName("com.rementia.openwakeword.lib.ml.OnnxModelRunner")
+                val onnxConstructor = onnxRunnerClass.getConstructor(android.content.res.AssetManager::class.java, String::class.java)
+                onnxRunnerInstance = onnxConstructor.newInstance(context.assets, "hey_jarvis_v0.1.onnx")
 
-            val wakeWordModelPath = File(context.filesDir, "hey_jarvis_v0.1.onnx").absolutePath
-            val models = listOf(WakeWordModel("Hey Jarvis", wakeWordModelPath, 0.5f))
+                val audioProcessorClass = Class.forName("com.rementia.openwakeword.lib.audio.AudioProcessor")
+                val processorConstructor = audioProcessorClass.getConstructor(android.content.res.AssetManager::class.java, onnxRunnerClass)
+                audioProcessorInstance = processorConstructor.newInstance(context.assets, onnxRunnerInstance)
 
-            engine = WakeWordEngine(
-                context,
-                models,
-                DetectionMode.SINGLE_BEST,
-                500L,
-                engineScope!!
-            )
+                predictMethod = audioProcessorClass.getMethod("predictWakeWord", FloatArray::class.java)
 
-            launch {
-                try {
-                    engine?.detections?.collect { detection ->
-                        if (detection.model.name == "Hey Jarvis" && detection.score >= 0.5f) {
-                            Log.d(TAG, "Wake word detected: ${detection.score}")
-                            notifyWakeWordDetected()
+                val bufferSize = AudioRecord.getMinBufferSize(
+                    sampleRate,
+                    channelConfig,
+                    audioFormat
+                ).coerceAtLeast(bufferSizeInShorts * 2)
+
+                val audioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize
+                )
+
+                if (audioRecord.state == AudioRecord.STATE_INITIALIZED) {
+                    audioRecord.startRecording()
+                    Log.d(TAG, "Wake word engine started via reflection")
+
+                    val shortBuffer = ShortArray(bufferSizeInShorts)
+                    val floatBuffer = FloatArray(bufferSizeInShorts)
+
+                    while (isActive && running) {
+                        val read = audioRecord.read(shortBuffer, 0, shortBuffer.size)
+                        if (read > 0) {
+                            var sum = 0.0
+
+                            // Convert short array (PCM) to float array [-1.0f, 1.0f]
+                            for (i in 0 until read) {
+                                val s = shortBuffer[i]
+                                floatBuffer[i] = s / 32768f
+                                sum += (s * s).toDouble()
+                            }
+
+                            val rms = sqrt(sum / read).toFloat()
+                            rmsFlow.value = rms
+
+                            // Predict wake word via reflection
+                            val score = predictMethod?.invoke(audioProcessorInstance, floatBuffer) as? Float ?: 0f
+
+                            if (score >= 0.5f) {
+                                val now = System.currentTimeMillis()
+                                if (now - lastDetectionTime > 1500L) { // Prevent burst triggering
+                                    Log.d(TAG, "Wake word detected: $score")
+                                    lastDetectionTime = now
+                                    notifyWakeWordDetected()
+                                }
+                            }
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Detection collection error", e)
+                    audioRecord.stop()
+                    audioRecord.release()
+                } else {
+                    Log.e(TAG, "AudioRecord initialization failed")
                 }
-            }
+            } catch (e: Exception) {
+                Log.e(TAG, "Custom AudioRecord loop failed", e)
+            } finally {
+                try {
+                    val audioProcessorClose = audioProcessorInstance?.javaClass?.getMethod("close")
+                    audioProcessorClose?.invoke(audioProcessorInstance)
 
-            engine?.start()
-            Log.d(TAG, "Wake word engine started")
+                    val onnxRunnerClose = onnxRunnerInstance?.javaClass?.getMethod("close")
+                    onnxRunnerClose?.invoke(onnxRunnerInstance)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to close reflection instances", e)
+                }
+
+                audioProcessorInstance = null
+                onnxRunnerInstance = null
+                predictMethod = null
+            }
         }
     }
 
@@ -89,10 +140,8 @@ class JarvisWakeWordEngine(
         running = false
 
         Log.d(TAG, "Wake word engine stopped")
-        engine?.stop()
-        engineScope?.cancel()
-        engineScope = null
-        engine = null
+        audioScope?.cancel()
+        audioScope = null
     }
 
     fun restart() {
@@ -102,8 +151,6 @@ class JarvisWakeWordEngine(
 
     fun release() {
         stop()
-        engine?.release()
-        engine = null
         Log.d(TAG, "Wake word engine released")
     }
 
