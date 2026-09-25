@@ -1,6 +1,8 @@
 package com.user.jarvis
 
 import android.Manifest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -688,10 +690,107 @@ class CommandExecutor(
                 )
             }
 
+            Command.JarvisVision -> {
+                val intent = Intent(context, VisionActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }
+
+            Command.CreatorWorkflowOn -> {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
+
+                val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    onSpeak("BlackHawk creator environment initialized. Background processes optimized.")
+                } else {
+                    onSpeak("Free Fire MAX installed nahi hai")
+                }
+            }
+
+            Command.EditVideo -> {
+                val success = appLauncher.openApp("vn video editor")
+                if (success) {
+                    onSpeak("Opening editing suite.")
+                } else {
+                    onSpeak("Video editor nahi mil raha")
+                }
+            }
+
+            Command.SecurityLockdown -> {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_RING, audioManager.getStreamMaxVolume(AudioManager.STREAM_RING), 0)
+
+                try {
+                    val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                    val adminComponent = android.content.ComponentName(context, JarvisDeviceAdminReceiver::class.java)
+                    if (dpm.isAdminActive(adminComponent)) {
+                        dpm.lockNow()
+                        onSpeak("Security protocol activated. System locked.")
+                    } else {
+                        onSpeak("Device admin permission chahiye")
+                    }
+                } catch (e: Exception) {
+                    onSpeak("Lock nahi kar paya")
+                }
+            }
+
+            Command.LocalEnvironmentIntel -> {
+                fetchLocalEnvironmentIntel()
+            }
+
             is Command.Unknown -> {
                 onSpeak("Samajh nahi aaya")
             }
         }
+    }
+
+    private fun fetchLocalEnvironmentIntel() {
+        val apiKey = context.getSharedPreferences("jarvis_prefs", Context.MODE_PRIVATE).getString("gemini_api_key", "") ?: ""
+        if (apiKey.isBlank()) {
+            onSpeak("API key nahi hai")
+            return
+        }
+
+        Thread {
+            try {
+                val prompt = "The user is currently in Arma, Lakhisarai, Bihar, India. Provide a very short, realistic weather estimation and local intel for this location in Hinglish."
+                val requestJson = org.json.JSONObject().apply {
+                    put("contents", org.json.JSONArray().put(
+                        org.json.JSONObject().apply {
+                            put("parts", org.json.JSONArray().put(org.json.JSONObject().apply { put("text", prompt) }))
+                        }
+                    ))
+                }
+                val body = requestJson.toString().toRequestBody("application/json".toMediaType())
+                val request = okhttp3.Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent")
+                    .addHeader("x-goog-api-key", apiKey)
+                    .post(body)
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    val responseText = response.body?.string().orEmpty()
+                    val root = org.json.JSONObject(responseText)
+
+                    if (root.has("error")) {
+                        Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
+                        return@use
+                    }
+                    val rawText = root.getJSONArray("candidates")
+                        .getJSONObject(0).getJSONObject("content")
+                        .getJSONArray("parts").getJSONObject(0).getString("text")
+                    Handler(Looper.getMainLooper()).post { onSpeak(rawText.trim()) }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
+            }
+        }.start()
     }
 
     private fun fetchWeatherForCurrentLocation() {
