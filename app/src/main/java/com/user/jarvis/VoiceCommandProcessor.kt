@@ -738,6 +738,36 @@ object VoiceCommandProcessor {
         }
 
         // ========================================================
+        // GAMING MODE
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "gaming mode on",
+                "launch free fire",
+                "game start karo"
+            )
+        ) {
+            return Command.GamingMode
+        }
+
+        // ========================================================
+        // CHECK SERVER STATUS
+        // ========================================================
+
+        if (
+            containsAny(
+                norm,
+                "check website",
+                "server status",
+                "website live hai ya down"
+            )
+        ) {
+            return Command.CheckServerStatus
+        }
+
+        // ========================================================
         // MESSAGE
         // ========================================================
 
