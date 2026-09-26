@@ -777,6 +777,30 @@ object VoiceCommandProcessor {
         }
 
         // ========================================================
+        // PHASE 3 EXPANSION
+        // ========================================================
+
+        if (containsAny(norm, "look at this", "isko dekho", "ye dekho")) {
+            return Command.JarvisVision
+        }
+
+        if (containsAny(norm, "recording workflow on", "start creator mode", "creator mode")) {
+            return Command.CreatorWorkflowOn
+        }
+
+        if (containsAny(norm, "edit video", "video edit")) {
+            return Command.EditVideo
+        }
+
+        if (containsAny(norm, "activate security protocol", "lockdown", "security protocol")) {
+            return Command.SecurityLockdown
+        }
+
+        if (containsAny(norm, "weather update", "mausam kaisa hai", "arma", "bihar intel")) {
+            return Command.LocalEnvironmentIntel
+        }
+
+        // ========================================================
         // OPEN APP
         // ========================================================
 

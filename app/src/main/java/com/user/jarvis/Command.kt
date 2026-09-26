@@ -31,5 +31,13 @@ sealed class Command {
     object SilentModeOff : Command()
     object LockPhone : Command()
     object GetWeather : Command()
+
+    // Phase 3 Extensions
+    object JarvisVision : Command()
+    object CreatorWorkflowOn : Command()
+    object EditVideo : Command()
+    object SecurityLockdown : Command()
+    object LocalEnvironmentIntel : Command()
+
     data class Unknown(val raw: String) : Command()
 }
