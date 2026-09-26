@@ -15,6 +15,11 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.content.pm.ServiceInfo
+import android.media.AudioManager
+import android.media.AudioFocusRequest
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -53,6 +58,9 @@ class JarvisListenerService : Service() {
     private var commandTimeoutRunnable: Runnable? = null
     private var wakeRestartRunnable: Runnable? = null
 
+    private var audioRecordThread: Thread? = null
+    @Volatile
+    private var activeAudioRecord: AudioRecord? = null
 
     // ========================================================
     // SERVICE
@@ -80,6 +88,15 @@ class JarvisListenerService : Service() {
             }
 
             acquireWakeLock()
+
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE).build()
+                audioManager.requestAudioFocus(focusRequest)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+            }
 
             initializeTts()
 
@@ -117,18 +134,8 @@ class JarvisListenerService : Service() {
                 android.util.Log.e(TAG, "Failed to initialize Wake Word Engine", e)
             }
 
-            handler.postDelayed(
-                {
-                    if (serviceActive) {
-                        try {
-                            startWakeWordDetection()
-                        } catch (e: Exception) {
-                            android.util.Log.e(TAG, "Failed to start wake word detection on service creation", e)
-                        }
-                    }
-                },
-                1200L
-            )
+            startAudioRecordLoop()
+
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Failed to start JarvisListenerService", e)
             stopSelf()
@@ -159,6 +166,15 @@ class JarvisListenerService : Service() {
     override fun onDestroy() {
 
         serviceActive = false
+        audioRecordThread?.interrupt()
+        audioRecordThread = null
+        try {
+            activeAudioRecord?.stop()
+        } catch (_: Exception) {}
+        try {
+            activeAudioRecord?.release()
+        } catch (_: Exception) {}
+        activeAudioRecord = null
 
         cancelWakeWordRestart()
         cancelCommandTimeout()
@@ -340,48 +356,110 @@ class JarvisListenerService : Service() {
 
 
     // ========================================================
-    // WAKE WORD
+    // WAKE WORD & AUDIO PIPELINE
     // ========================================================
 
-    private fun startWakeWordDetection() {
+    private fun startAudioRecordLoop() {
+        audioRecordThread = Thread {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
 
+            while (serviceActive) {
+                var audioRecord: AudioRecord? = null
+                try {
+                    val sampleRate = 16000
+                    val channelConfig = AudioFormat.CHANNEL_IN_MONO
+                    val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+                    val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat).coerceAtLeast(1280 * 2)
+
+                    if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        Thread.sleep(1000L)
+                        continue
+                    }
+
+                    audioRecord = AudioRecord(
+                        MediaRecorder.AudioSource.MIC,
+                        sampleRate,
+                        channelConfig,
+                        audioFormat,
+                        bufferSize
+                    )
+                    activeAudioRecord = audioRecord
+
+                    if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
+                        throw IllegalStateException("AudioRecord initialization failed")
+                    }
+
+                    audioRecord.startRecording()
+
+                    val shortBuffer = ShortArray(1280)
+                    val floatBuffer = FloatArray(1280)
+
+                    while (serviceActive) {
+                        val readResult = audioRecord.read(shortBuffer, 0, shortBuffer.size)
+
+                        if (readResult < 0) {
+                            if (readResult == AudioRecord.ERROR_INVALID_OPERATION ||
+                                readResult == AudioRecord.ERROR_DEAD_OBJECT ||
+                                readResult == AudioRecord.ERROR_BAD_VALUE) {
+                                throw Exception("AudioRecord read error: $readResult")
+                            }
+                            continue
+                        }
+
+                        if (!waitingForCommand && !isSpeaking) {
+                            for (i in 0 until readResult) {
+                                floatBuffer[i] = shortBuffer[i] / 32768.0f
+                            }
+
+                            val chunk = if (readResult == floatBuffer.size) floatBuffer else floatBuffer.copyOf(readResult)
+                            wakeWordEngine?.processAudioChunk(chunk)
+                        }
+                    }
+                } catch (e: InterruptedException) {
+                    break
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "AudioRecord loop exception", e)
+                } finally {
+                    try {
+                        audioRecord?.stop()
+                    } catch (_: Exception) {}
+                    try {
+                        audioRecord?.release()
+                    } catch (_: Exception) {}
+                    if (activeAudioRecord === audioRecord) {
+                        activeAudioRecord = null
+                    }
+                }
+
+                if (serviceActive) {
+                    try {
+                        Thread.sleep(1000L)
+                    } catch (e: InterruptedException) {
+                        break
+                    } catch (_: Exception) {}
+                }
+            }
+        }.apply {
+            start()
+        }
+    }
+
+    private fun startWakeWordDetection() {
         if (!serviceActive) return
         if (waitingForCommand) return
         if (isSpeaking) return
 
-        if (
-            checkSelfPermission(
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            updateNotification(
-                "Microphone permission required"
-            )
-
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            updateNotification("Microphone permission required")
             return
         }
 
         cancelRecognition()
-
-        updateNotification(
-            "Listening for Hey Jarvis"
-        )
-
-        try {
-            wakeWordEngine?.restart()
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "Wake word engine restart failed", e)
-        }
+        updateNotification("Listening for Hey Jarvis")
     }
 
-
     private fun stopWakeWordDetection() {
-
-        try {
-            wakeWordEngine?.stop()
-        } catch (_: Exception) {
-        }
+        // Handled directly by checking `waitingForCommand` in continuous loop
     }
 
 
@@ -930,6 +1008,15 @@ class JarvisListenerService : Service() {
     private fun stopJarvisService() {
 
         serviceActive = false
+        audioRecordThread?.interrupt()
+        audioRecordThread = null
+        try {
+            activeAudioRecord?.stop()
+        } catch (_: Exception) {}
+        try {
+            activeAudioRecord?.release()
+        } catch (_: Exception) {}
+        activeAudioRecord = null
 
         cancelWakeWordRestart()
         cancelCommandTimeout()
