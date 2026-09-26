@@ -58,7 +58,7 @@ class VisionActivity : Activity(), TextToSpeech.OnInitListener {
         val byteArray = stream.toByteArray()
         val base64Image = Base64.getEncoder().encodeToString(byteArray)
 
-        val apiKey = getSharedPreferences("jarvis_prefs", MODE_PRIVATE).getString("gemini_api_key", "") ?: ""
+        val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isBlank()) {
             speakAndFinish("API key nahi hai")
             return

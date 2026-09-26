@@ -429,21 +429,12 @@ class JarvisListenerService : Service() {
 
         isSpeaking = true
 
-        ElevenLabsManager.speak(this, text, fallback = {
-            tts?.speak(
-                text,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                utteranceId
-            )
-        }, onComplete = {
-            isSpeaking = false
-            if (waitingForCommand) {
-                startCommandListening()
-            } else {
-                scheduleWakeWordRestart(500L)
-            }
-        })
+        tts?.speak(
+            text,
+            TextToSpeech.QUEUE_FLUSH,
+            null,
+            utteranceId
+        )
     }
 
 
