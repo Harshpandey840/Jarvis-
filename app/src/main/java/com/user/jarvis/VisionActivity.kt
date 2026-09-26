@@ -66,7 +66,7 @@ class VisionActivity : Activity(), TextToSpeech.OnInitListener {
 
         Thread {
             try {
-                val prompt = "Analyze this image and describe it briefly in Hinglish (Hindi/English mix)."
+                val prompt = "Briefly describe this image"
 
                 val inlineData = JSONObject().apply {
                     put("mimeType", "image/jpeg")

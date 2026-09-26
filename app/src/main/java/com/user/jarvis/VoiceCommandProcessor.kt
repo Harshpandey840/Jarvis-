@@ -780,23 +780,23 @@ object VoiceCommandProcessor {
         // PHASE 3 EXPANSION
         // ========================================================
 
-        if (containsAny(norm, "look at this", "isko dekho", "ye dekho")) {
+        if (containsAny(norm, "jarvis look at this", "isko dekho")) {
             return Command.JarvisVision
         }
 
-        if (containsAny(norm, "recording workflow on", "start creator mode", "creator mode")) {
-            return Command.CreatorWorkflowOn
+        if (containsAny(norm, "gaming mode on", "launch free fire", "game start karo")) {
+            return Command.GamingModeOn
         }
 
         if (containsAny(norm, "edit video", "video edit")) {
             return Command.EditVideo
         }
 
-        if (containsAny(norm, "activate security protocol", "lockdown", "security protocol")) {
+        if (containsAny(norm, "activate security protocol", "lockdown")) {
             return Command.SecurityLockdown
         }
 
-        if (containsAny(norm, "weather update", "mausam kaisa hai", "arma", "bihar intel")) {
+        if (containsAny(norm, "weather update", "mausam kaisa hai")) {
             return Command.LocalEnvironmentIntel
         }
 

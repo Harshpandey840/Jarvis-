@@ -697,7 +697,7 @@ class CommandExecutor(
                 context.startActivity(intent)
             }
 
-            Command.CreatorWorkflowOn -> {
+            Command.GamingModeOn -> {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                 audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
@@ -706,7 +706,7 @@ class CommandExecutor(
                 if (intent != null) {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
-                    onSpeak("BlackHawk creator environment initialized. Background processes optimized.")
+                    onSpeak("Gaming mode activated for BlackHawk. Good luck, sir.")
                 } else {
                     onSpeak("Free Fire MAX installed nahi hai")
                 }
@@ -722,10 +722,6 @@ class CommandExecutor(
             }
 
             Command.SecurityLockdown -> {
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
-                audioManager.setStreamVolume(AudioManager.STREAM_RING, audioManager.getStreamMaxVolume(AudioManager.STREAM_RING), 0)
-
                 try {
                     val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
                     val adminComponent = android.content.ComponentName(context, JarvisDeviceAdminReceiver::class.java)
@@ -759,7 +755,7 @@ class CommandExecutor(
 
         Thread {
             try {
-                val prompt = "The user is currently in Arma, Lakhisarai, Bihar, India. Provide a very short, realistic weather estimation and local intel for this location in Hinglish."
+                val prompt = "The user is currently in Arma, Lakhisarai, Bihar, India. Provide a very brief, realistic current weather estimation and local intel for this location."
                 val requestJson = org.json.JSONObject().apply {
                     put("contents", org.json.JSONArray().put(
                         org.json.JSONObject().apply {
