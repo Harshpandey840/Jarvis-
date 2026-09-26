@@ -16,6 +16,13 @@ import android.os.Looper
 import android.os.PowerManager
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.FrameLayout
 import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -60,6 +67,9 @@ class JarvisListenerService : Service() {
     private var notificationPingRunnable: Runnable? = null
     private var notificationDotCount = 1
 
+    private var windowManager: WindowManager? = null
+    private var overlayView: View? = null
+
     private var audioRecordThread: Thread? = null
     @Volatile
     private var activeAudioRecord: AudioRecord? = null
@@ -75,6 +85,8 @@ class JarvisListenerService : Service() {
             serviceActive = true
 
             createNotificationChannel()
+
+            createOverlayWindow()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 startForeground(
@@ -181,6 +193,7 @@ class JarvisListenerService : Service() {
     override fun onDestroy() {
 
         serviceActive = false
+        removeOverlayWindow()
         audioRecordThread?.interrupt()
         audioRecordThread = null
         try {
@@ -229,6 +242,50 @@ class JarvisListenerService : Service() {
         super.onDestroy()
     }
 
+
+    private fun createOverlayWindow() {
+        if (!Settings.canDrawOverlays(this)) return
+
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val frameLayout = FrameLayout(this)
+        frameLayout.setBackgroundColor(Color.CYAN)
+        frameLayout.alpha = 0.5f
+
+        val layoutParams = WindowManager.LayoutParams(
+            10,
+            10,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+        layoutParams.gravity = Gravity.TOP or Gravity.START
+        layoutParams.x = 0
+        layoutParams.y = 0
+
+        overlayView = frameLayout
+        try {
+            windowManager?.addView(overlayView, layoutParams)
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to add overlay window", e)
+        }
+    }
+
+    private fun removeOverlayWindow() {
+        try {
+            if (overlayView != null) {
+                windowManager?.removeView(overlayView)
+                overlayView = null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to remove overlay window", e)
+        }
+    }
 
     // ========================================================
     // TEXT TO SPEECH
@@ -1041,6 +1098,7 @@ class JarvisListenerService : Service() {
     private fun stopJarvisService() {
 
         serviceActive = false
+        removeOverlayWindow()
         audioRecordThread?.interrupt()
         audioRecordThread = null
         try {
