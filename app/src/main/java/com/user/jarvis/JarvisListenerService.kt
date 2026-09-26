@@ -17,6 +17,7 @@ import android.os.PowerManager
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.media.AudioFocusRequest
+import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -243,6 +244,12 @@ class JarvisListenerService : Service() {
                 tts?.setSpeechRate(1.0f)
                 tts?.setPitch(1.0f)
 
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                tts?.setAudioAttributes(audioAttributes)
+
                 tts?.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {
 
@@ -346,6 +353,15 @@ class JarvisListenerService : Service() {
 
         isSpeaking = true
 
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).build()
+            audioManager.requestAudioFocus(focusRequest)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        }
+
         tts?.speak(
             text,
             TextToSpeech.QUEUE_FLUSH,
@@ -377,7 +393,7 @@ class JarvisListenerService : Service() {
                     }
 
                     audioRecord = AudioRecord(
-                        MediaRecorder.AudioSource.MIC,
+                        MediaRecorder.AudioSource.VOICE_RECOGNITION,
                         sampleRate,
                         channelConfig,
                         audioFormat,
@@ -739,6 +755,7 @@ class JarvisListenerService : Service() {
                 )
 
                 putExtra("android.speech.extra.AUDIO_SOURCE", android.media.MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
             }
 
         try {
