@@ -17,7 +17,7 @@ object ElevenLabsManager {
 
     fun speak(context: Context, text: String, fallback: () -> Unit, onComplete: (() -> Unit)? = null) {
         val prefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("elevenlabs_api_key", null)
+        val apiKey = prefs.getString("ELEVENLABS_API_KEY", null)
 
         if (apiKey.isNullOrBlank()) {
             Handler(Looper.getMainLooper()).post { fallback() }

@@ -165,20 +165,20 @@ override fun onResume() {
 
     private fun checkElevenLabsApiKey() {
         val prefs = getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        if (!prefs.contains("elevenlabs_api_key")) {
+        if (!prefs.contains("ELEVENLABS_API_KEY")) {
             val input = EditText(this).apply {
                 inputType = InputType.TYPE_CLASS_TEXT
                 hint = "Paste ElevenLabs API Key"
             }
             AlertDialog.Builder(this)
-                .setTitle("ElevenLabs API Key")
+                .setTitle("Enter ElevenLabs API Key")
                 .setMessage("Please enter your ElevenLabs API Key for better voice:")
                 .setView(input)
                 .setCancelable(false)
                 .setPositiveButton("Save") { _, _ ->
                     val key = input.text.toString().trim()
                     if (key.isNotEmpty()) {
-                        prefs.edit().putString("elevenlabs_api_key", key).apply()
+                        prefs.edit().putString("ELEVENLABS_API_KEY", key).apply()
                         Toast.makeText(this, "API Key Saved", Toast.LENGTH_SHORT).show()
                     }
                 }
