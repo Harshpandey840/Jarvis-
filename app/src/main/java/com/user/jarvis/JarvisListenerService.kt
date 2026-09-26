@@ -57,6 +57,8 @@ class JarvisListenerService : Service() {
 
     private var commandTimeoutRunnable: Runnable? = null
     private var wakeRestartRunnable: Runnable? = null
+    private var notificationPingRunnable: Runnable? = null
+    private var notificationDotCount = 1
 
     private var audioRecordThread: Thread? = null
     @Volatile
@@ -130,9 +132,22 @@ class JarvisListenerService : Service() {
                 ) {
                     onWakeWordDetected()
                 }
+                wakeWordEngine?.start()
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Failed to initialize Wake Word Engine", e)
             }
+
+            notificationPingRunnable = object : Runnable {
+                override fun run() {
+                    if (serviceActive && !waitingForCommand && !isSpeaking) {
+                        val dots = ".".repeat(notificationDotCount)
+                        updateNotification("Jarvis Online - Listening$dots")
+                        notificationDotCount = if (notificationDotCount >= 3) 1 else notificationDotCount + 1
+                    }
+                    handler.postDelayed(this, 2000L)
+                }
+            }
+            handler.post(notificationPingRunnable!!)
 
             startAudioRecordLoop()
 
@@ -183,6 +198,9 @@ class JarvisListenerService : Service() {
         speakThenListenForCommand = false
 
         stopWakeWordDetection()
+
+        notificationPingRunnable?.let { handler.removeCallbacks(it) }
+        notificationPingRunnable = null
 
         wakeWordEngine?.release()
         wakeWordEngine = null
@@ -393,6 +411,7 @@ class JarvisListenerService : Service() {
 
                     val shortBuffer = ShortArray(1280)
                     val floatBuffer = FloatArray(1280)
+                    var consecutiveSilentChunks = 0
 
                     while (serviceActive) {
                         val readResult = audioRecord.read(shortBuffer, 0, shortBuffer.size)
@@ -407,8 +426,22 @@ class JarvisListenerService : Service() {
                         }
 
                         if (!waitingForCommand && !isSpeaking) {
+                            var sumSq = 0.0f
                             for (i in 0 until readResult) {
-                                floatBuffer[i] = shortBuffer[i] / 32768.0f
+                                val value = shortBuffer[i] / 32768.0f
+                                floatBuffer[i] = value
+                                sumSq += value * value
+                            }
+
+                            val rms = if (readResult > 0) kotlin.math.sqrt(sumSq / readResult) else 0.0f
+                            if (rms == 0.0f) {
+                                consecutiveSilentChunks++
+                                if (consecutiveSilentChunks >= 37) { // Approx 3 seconds
+                                    android.util.Log.w(TAG, "SILENT_AUDIO_RESTRICTION_TRIGGERED")
+                                    consecutiveSilentChunks = 0 // Reset to avoid spamming too much
+                                }
+                            } else {
+                                consecutiveSilentChunks = 0
                             }
 
                             val chunk = if (readResult == floatBuffer.size) floatBuffer else floatBuffer.copyOf(readResult)
@@ -1022,6 +1055,9 @@ class JarvisListenerService : Service() {
         cancelCommandTimeout()
 
         stopWakeWordDetection()
+
+        notificationPingRunnable?.let { handler.removeCallbacks(it) }
+        notificationPingRunnable = null
 
         try {
             wakeWordEngine?.release()
