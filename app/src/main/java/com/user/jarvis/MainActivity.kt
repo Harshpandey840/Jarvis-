@@ -119,6 +119,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
+
+        if (!Settings.canDrawOverlays(this)) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+            try {
+                startActivity(intent)
+            } catch (e: Exception) { }
+        }
     }
 override fun onResume() {
         super.onResume()
