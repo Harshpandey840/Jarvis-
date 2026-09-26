@@ -11,73 +11,125 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 object ElevenLabsManager {
-    private val httpClient = OkHttpClient()
 
-    fun speak(context: Context, text: String, fallback: () -> Unit, onComplete: (() -> Unit)? = null) {
-        val prefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("ELEVENLABS_API_KEY", null)
+    private const val API_KEY = "a578fb1343730eb8901efc64c0395cecba3faaee21987bfc7d8fd52c138eb62b"
+    private const val VOICE_ID = "pNInz6obpgDQGcFmaJcg"
 
-        if (apiKey.isNullOrBlank()) {
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    fun speak(
+        context: Context,
+        text: String,
+        fallback: () -> Unit,
+        onComplete: (() -> Unit)? = null
+    ) {
+        if (API_KEY == "YOUR_ELEVENLABS_API_KEY" || API_KEY.isBlank()) {
             Handler(Looper.getMainLooper()).post { fallback() }
             return
         }
 
+        if (text.isBlank()) {
+            Handler(Looper.getMainLooper()).post {
+                onComplete?.invoke()
+            }
+            return
+        }
+
         Thread {
+            var tempFile: File? = null
+
             try {
                 val jsonBody = JSONObject().apply {
                     put("text", text)
                     put("model_id", "eleven_multilingual_v2")
+                    put("voice_settings", JSONObject().apply {
+                        put("stability", 0.5)
+                        put("similarity_boost", 0.75)
+                        put("style", 0.0)
+                        put("use_speaker_boost", true)
+                    })
                 }
 
-                val body = jsonBody.toString().toRequestBody("application/json".toMediaType())
+                val requestBody = jsonBody.toString()
+                    .toRequestBody("application/json".toMediaType())
+
                 val request = Request.Builder()
-                    .url("https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJcg")
-                    .addHeader("xi-api-key", apiKey)
-                    .post(body)
+                    .url("https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID")
+                    .addHeader("xi-api-key", API_KEY)
+                    .addHeader("Accept", "audio/mpeg")
+                    .post(requestBody)
                     .build()
 
                 httpClient.newCall(request).execute().use { response ->
+
                     if (!response.isSuccessful) {
-                        Handler(Looper.getMainLooper()).post { fallback() }
+                        Handler(Looper.getMainLooper()).post {
+                            fallback()
+                        }
                         return@use
                     }
 
-                    val responseBytes = response.body?.bytes()
-                    if (responseBytes == null) {
-                        Handler(Looper.getMainLooper()).post { fallback() }
+                    val audioBytes = response.body?.bytes()
+
+                    if (audioBytes == null || audioBytes.isEmpty()) {
+                        Handler(Looper.getMainLooper()).post {
+                            fallback()
+                        }
                         return@use
                     }
 
-                    val tempFile = File.createTempFile("elevenlabs_tts", ".mp3", context.cacheDir)
-                    FileOutputStream(tempFile).use { it.write(responseBytes) }
+                    tempFile = File.createTempFile(
+                        "jarvis_voice_",
+                        ".mp3",
+                        context.cacheDir
+                    )
+
+                    FileOutputStream(tempFile).use {
+                        it.write(audioBytes)
+                    }
 
                     Handler(Looper.getMainLooper()).post {
                         try {
                             val mediaPlayer = MediaPlayer()
-                            mediaPlayer.setDataSource(tempFile.absolutePath)
-                            mediaPlayer.setOnCompletionListener {
-                                it.release()
-                                tempFile.delete()
+
+                            mediaPlayer.setDataSource(tempFile!!.absolutePath)
+
+                            mediaPlayer.setOnCompletionListener { player ->
+                                player.release()
+                                tempFile?.delete()
                                 onComplete?.invoke()
                             }
-                            mediaPlayer.setOnErrorListener { mp, _, _ ->
-                                mp.release()
-                                tempFile.delete()
+
+                            mediaPlayer.setOnErrorListener { player, _, _ ->
+                                player.release()
+                                tempFile?.delete()
                                 fallback()
                                 true
                             }
+
                             mediaPlayer.prepare()
                             mediaPlayer.start()
+
                         } catch (e: Exception) {
-                            tempFile.delete()
+                            tempFile?.delete()
                             fallback()
                         }
                     }
                 }
+
             } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post { fallback() }
+                tempFile?.delete()
+
+                Handler(Looper.getMainLooper()).post {
+                    fallback()
+                }
             }
         }.start()
     }
