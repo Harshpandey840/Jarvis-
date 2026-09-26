@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit
 
 object ElevenLabsManager {
 
-    private const val API_KEY = "a578fb1343730eb8901efc64c0395cecba3faaee21987bfc7d8fd52c138eb62b"
     private const val VOICE_ID = "pNInz6obpgDQGcFmaJcg"
 
     private val httpClient = OkHttpClient.Builder()
@@ -31,11 +30,6 @@ object ElevenLabsManager {
         fallback: () -> Unit,
         onComplete: (() -> Unit)? = null
     ) {
-        if (API_KEY == "YOUR_ELEVENLABS_API_KEY" || API_KEY.isBlank()) {
-            Handler(Looper.getMainLooper()).post { fallback() }
-            return
-        }
-
         if (text.isBlank()) {
             Handler(Looper.getMainLooper()).post {
                 onComplete?.invoke()
@@ -43,19 +37,24 @@ object ElevenLabsManager {
             return
         }
 
+        // Step 1: Check Key First
+        val prefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
+        val apiKey = prefs.getString("ELEVENLABS_API_KEY", null)
+
+        if (apiKey.isNullOrEmpty() || apiKey == "YOUR_ELEVENLABS_API_KEY") {
+            Handler(Looper.getMainLooper()).post { fallback() }
+            return
+        }
+
         Thread {
             var tempFile: File? = null
 
+            // Step 4: Wrap in Try-Catch
             try {
+                // Step 2: Strict ElevenLabs Network Call
                 val jsonBody = JSONObject().apply {
                     put("text", text)
                     put("model_id", "eleven_multilingual_v2")
-                    put("voice_settings", JSONObject().apply {
-                        put("stability", 0.5)
-                        put("similarity_boost", 0.75)
-                        put("style", 0.0)
-                        put("use_speaker_boost", true)
-                    })
                 }
 
                 val requestBody = jsonBody.toString()
@@ -63,76 +62,60 @@ object ElevenLabsManager {
 
                 val request = Request.Builder()
                     .url("https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID")
-                    .addHeader("xi-api-key", API_KEY)
+                    .addHeader("xi-api-key", apiKey)
                     .addHeader("Accept", "audio/mpeg")
                     .post(requestBody)
                     .build()
 
                 httpClient.newCall(request).execute().use { response ->
-
+                    // Step 3: Handle Response
                     if (!response.isSuccessful) {
-                        val errorReason = "ElevenLabs Error: ${response.code} ${response.message}"
+                        val errorCode = response.code
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, errorReason, Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "ElevenLabs Error: $errorCode", Toast.LENGTH_LONG).show()
                             fallback()
                         }
                         return@use
                     }
 
-                    val audioBytes = response.body?.bytes()
-
-                    if (audioBytes == null || audioBytes.isEmpty()) {
-                        Handler(Looper.getMainLooper()).post {
-                            fallback()
-                        }
+                    val inputStream = response.body?.byteStream()
+                    if (inputStream == null) {
+                        Handler(Looper.getMainLooper()).post { fallback() }
                         return@use
                     }
 
-                    tempFile = File.createTempFile(
-                        "jarvis_voice_",
-                        ".mp3",
-                        context.cacheDir
-                    )
-
-                    FileOutputStream(tempFile).use {
-                        it.write(audioBytes)
+                    tempFile = File.createTempFile("jarvis_voice_", ".mp3", context.cacheDir)
+                    FileOutputStream(tempFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
                     }
 
                     Handler(Looper.getMainLooper()).post {
                         try {
                             val mediaPlayer = MediaPlayer()
-
                             mediaPlayer.setDataSource(tempFile!!.absolutePath)
-
                             mediaPlayer.setOnCompletionListener { player ->
                                 player.release()
                                 tempFile?.delete()
                                 onComplete?.invoke()
                             }
-
                             mediaPlayer.setOnErrorListener { player, _, _ ->
                                 player.release()
                                 tempFile?.delete()
                                 fallback()
                                 true
                             }
-
                             mediaPlayer.prepare()
                             mediaPlayer.start()
-
                         } catch (e: Exception) {
                             tempFile?.delete()
                             fallback()
                         }
                     }
                 }
-
             } catch (e: Exception) {
                 tempFile?.delete()
-                val errorMessage = "ElevenLabs Exception: ${e.message ?: "Unknown error"}"
-
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "TTS Network Exception", Toast.LENGTH_LONG).show()
                     fallback()
                 }
             }
