@@ -747,7 +747,7 @@ class CommandExecutor(
     }
 
     private fun fetchLocalEnvironmentIntel() {
-        val apiKey = context.getSharedPreferences("jarvis_prefs", Context.MODE_PRIVATE).getString("gemini_api_key", "") ?: ""
+        val apiKey = BuildConfig.GEMINI_API_KEY
         if (apiKey.isBlank()) {
             onSpeak("API key nahi hai")
             return
