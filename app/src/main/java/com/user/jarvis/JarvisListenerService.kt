@@ -61,65 +61,78 @@ class JarvisListenerService : Service() {
     override fun onCreate() {
         super.onCreate()
 
-        serviceActive = true
+        try {
+            serviceActive = true
 
-        createNotificationChannel()
+            createNotificationChannel()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                createNotification("Jarvis starting..."),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-            )
-        } else {
-            startForeground(
-                NOTIFICATION_ID,
-                createNotification("Jarvis starting...")
-            )
-        }
-
-        acquireWakeLock()
-
-        initializeTts()
-
-        commandExecutor = CommandExecutor(
-            applicationContext,
-            { text ->
-                handler.post {
-                    if (serviceActive) {
-                        speak(text)
-                    }
-                }
-            },
-            {
-                handler.post {
-                    if (
-                        serviceActive &&
-                        !isSpeaking &&
-                        !waitingForCommand
-                    ) {
-                        scheduleWakeWordRestart(250L)
-                    }
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification("Jarvis Online - Listening..."),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification("Jarvis Online - Listening...")
+                )
             }
-        )
 
-        createSpeechRecognizer()
+            acquireWakeLock()
 
-        wakeWordEngine = JarvisWakeWordEngine(
-            applicationContext
-        ) {
-            onWakeWordDetected()
-        }
+            initializeTts()
 
-        handler.postDelayed(
-            {
-                if (serviceActive) {
-                    startWakeWordDetection()
+            commandExecutor = CommandExecutor(
+                applicationContext,
+                { text ->
+                    handler.post {
+                        if (serviceActive) {
+                            speak(text)
+                        }
+                    }
+                },
+                {
+                    handler.post {
+                        if (
+                            serviceActive &&
+                            !isSpeaking &&
+                            !waitingForCommand
+                        ) {
+                            scheduleWakeWordRestart(250L)
+                        }
+                    }
                 }
-            },
-            1200L
-        )
+            )
+
+            createSpeechRecognizer()
+
+            try {
+                wakeWordEngine = JarvisWakeWordEngine(
+                    applicationContext
+                ) {
+                    onWakeWordDetected()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Failed to initialize Wake Word Engine", e)
+            }
+
+            handler.postDelayed(
+                {
+                    if (serviceActive) {
+                        try {
+                            startWakeWordDetection()
+                        } catch (e: Exception) {
+                            android.util.Log.e(TAG, "Failed to start wake word detection on service creation", e)
+                        }
+                    }
+                },
+                1200L
+            )
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to start JarvisListenerService", e)
+            stopSelf()
+        }
     }
 
 
@@ -355,7 +368,11 @@ class JarvisListenerService : Service() {
             "Listening for Hey Jarvis"
         )
 
-        wakeWordEngine?.restart()
+        try {
+            wakeWordEngine?.restart()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Wake word engine restart failed", e)
+        }
     }
 
 
@@ -642,6 +659,8 @@ class JarvisListenerService : Service() {
                     RecognizerIntent.EXTRA_MAX_RESULTS,
                     5
                 )
+
+                putExtra("android.speech.extra.AUDIO_SOURCE", android.media.MediaRecorder.AudioSource.VOICE_RECOGNITION)
             }
 
         try {
