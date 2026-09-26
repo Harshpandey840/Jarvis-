@@ -67,17 +67,7 @@ class JarvisWakeWordEngine(
                 scope!!
             )
 
-            scope?.launch {
-                wakeWordEngine!!.detections.collect { detection ->
-                    if (running) {
-                        Log.d(TAG, "Wake word detected: \${detection.model.name} score: \${detection.score}")
-                        notifyWakeWordDetected()
-                    }
-                }
-            }
-
-            wakeWordEngine?.start()
-            Log.d(TAG, "Wake word engine started")
+            Log.d(TAG, "Wake word engine initialized without internal audio recording")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word engine", e)
             running = false
@@ -118,6 +108,31 @@ class JarvisWakeWordEngine(
 
     fun isRunning(): Boolean {
         return running
+    }
+
+    fun processAudioChunk(audioBuffer: FloatArray): Float {
+        if (!running || wakeWordEngine == null) return 0f
+        var maxScore = 0f
+        try {
+            val engineClass = wakeWordEngine!!.javaClass
+            val fieldGetModelProcessors = engineClass.getDeclaredField("modelProcessors")
+            fieldGetModelProcessors.isAccessible = true
+            val map = fieldGetModelProcessors.get(wakeWordEngine!!) as Map<*, *>
+            for (processor in map.values) {
+                if (processor != null) {
+                    val processMethod = processor.javaClass.getDeclaredMethod("process", FloatArray::class.java)
+                    processMethod.isAccessible = true
+                    val score = processMethod.invoke(processor, audioBuffer) as Float
+                    if (score > maxScore) maxScore = score
+                }
+            }
+            if (maxScore >= 0.5f) {
+                notifyWakeWordDetected()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to process audio chunk via reflection", e)
+        }
+        return maxScore
     }
 
     fun notifyWakeWordDetected() {
