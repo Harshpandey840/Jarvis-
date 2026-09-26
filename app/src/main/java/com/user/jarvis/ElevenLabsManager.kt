@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -70,7 +71,9 @@ object ElevenLabsManager {
                 httpClient.newCall(request).execute().use { response ->
 
                     if (!response.isSuccessful) {
+                        val errorReason = "ElevenLabs Error: ${response.code} ${response.message}"
                         Handler(Looper.getMainLooper()).post {
+                            Toast.makeText(context, errorReason, Toast.LENGTH_LONG).show()
                             fallback()
                         }
                         return@use
@@ -126,8 +129,10 @@ object ElevenLabsManager {
 
             } catch (e: Exception) {
                 tempFile?.delete()
+                val errorMessage = "ElevenLabs Exception: ${e.message ?: "Unknown error"}"
 
                 Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                     fallback()
                 }
             }
