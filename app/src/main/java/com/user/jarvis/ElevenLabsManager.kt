@@ -52,13 +52,12 @@ object ElevenLabsManager {
             // Step 4: Wrap in Try-Catch
             try {
                 // Step 2: Strict ElevenLabs Network Call
-                val jsonBody = JSONObject().apply {
-                    put("text", text)
-                    put("model_id", "eleven_multilingual_v2")
-                }
+                val jsonBody = JSONObject()
+                jsonBody.put("text", text)
+                jsonBody.put("model_id", "eleven_multilingual_v2")
 
                 val requestBody = jsonBody.toString()
-                    .toRequestBody("application/json".toMediaType())
+                    .toRequestBody("application/json; charset=utf-8".toMediaType())
 
                 val request = Request.Builder()
                     .url("https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID")
