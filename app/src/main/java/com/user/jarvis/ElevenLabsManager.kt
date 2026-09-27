@@ -16,8 +16,6 @@ import java.util.concurrent.TimeUnit
 
 object ElevenLabsManager {
 
-    private const val VOICE_ID = "pNInz6obpgDQGcFmaJcg"
-
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -61,7 +59,7 @@ object ElevenLabsManager {
                     .toRequestBody("application/json; charset=utf-8".toMediaType())
 
                 val request = Request.Builder()
-                    .url("https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJcg")
+                    .url("https://api.elevenlabs.io/v1/text-to-speech/ErXwobaYiN019PkySvjV")
                     .addHeader("xi-api-key", apiKey)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "audio/mpeg")
