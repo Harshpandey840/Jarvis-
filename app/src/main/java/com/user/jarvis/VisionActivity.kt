@@ -1,12 +1,12 @@
 package com.user.jarvis
 
-import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -18,38 +18,26 @@ import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-class VisionActivity : Activity(), TextToSpeech.OnInitListener {
+class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
-    private val REQUEST_IMAGE_CAPTURE = 101
     private var tts: TextToSpeech? = null
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        tts = TextToSpeech(this, this)
-        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (takePictureIntent.resolveActivity(packageManager) != null) {
-            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
+    private val takePicturePreview = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) {
+            analyzeImage(bitmap)
         } else {
-            finish()
+            speakAndFinish("Image nahi mil paaya")
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            val imageBitmap = data?.extras?.get("data") as? Bitmap
-            if (imageBitmap != null) {
-                analyzeImage(imageBitmap)
-            } else {
-                speakAndFinish("Image nahi mil paaya")
-            }
-        } else {
-            finish()
-        }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        tts = TextToSpeech(this, this)
+        takePicturePreview.launch(null)
     }
 
     private fun analyzeImage(bitmap: Bitmap) {
@@ -86,7 +74,7 @@ class VisionActivity : Activity(), TextToSpeech.OnInitListener {
 
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent")
+                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
                     .addHeader("x-goog-api-key", apiKey)
                     .post(body)
                     .build()
@@ -124,23 +112,10 @@ class VisionActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun speakAndFinish(text: String) {
         runOnUiThread {
-            val params = Bundle().apply {
-                putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "VisionResponse")
-            }
-
-            tts?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
-
-                override fun onDone(utteranceId: String?) {
-                    runOnUiThread { finish() }
-                }
-
-                override fun onError(utteranceId: String?) {
-                    runOnUiThread { finish() }
-                }
+            ElevenLabsManager.speak(this@VisionActivity, text, fallback = {
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VisionResponse")
             })
-
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "VisionResponse")
+            finish()
         }
     }
 
