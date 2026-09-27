@@ -697,10 +697,11 @@ class CommandExecutor(
                 context.startActivity(intent)
             }
 
-            Command.GamingModeOn -> {
+            Command.GamingMode -> {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
+                val targetVolume = (maxVolume * 0.85).toInt()
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, AudioManager.FLAG_SHOW_UI)
 
                 val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
                 if (intent != null) {
@@ -708,7 +709,7 @@ class CommandExecutor(
                     context.startActivity(intent)
                     onSpeak("Gaming mode activated for BlackHawk. Good luck, sir.")
                 } else {
-                    onSpeak("Free Fire MAX installed nahi hai")
+                    onSpeak("Free Fire MAX is not installed, sir.")
                 }
             }
 
@@ -738,23 +739,6 @@ class CommandExecutor(
 
             Command.LocalEnvironmentIntel -> {
                 fetchLocalEnvironmentIntel()
-            }
-
-
-            Command.GamingMode -> {
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                val targetVolume = (maxVolume * 0.85).toInt()
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, AudioManager.FLAG_SHOW_UI)
-
-                val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
-                if (intent != null) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    onSpeak("Gaming mode activated for BlackHawk. Good luck, sir.")
-                } else {
-                    onSpeak("Free Fire MAX is not installed, sir.")
-                }
             }
 
 
