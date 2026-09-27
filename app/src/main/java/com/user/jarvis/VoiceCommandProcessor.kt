@@ -785,7 +785,7 @@ object VoiceCommandProcessor {
         }
 
         if (containsAny(norm, "gaming mode on", "launch free fire", "game start karo")) {
-            return Command.GamingModeOn
+            return Command.GamingMode
         }
 
         if (containsAny(norm, "edit video", "video edit")) {
@@ -798,6 +798,10 @@ object VoiceCommandProcessor {
 
         if (containsAny(norm, "weather update", "mausam kaisa hai")) {
             return Command.LocalEnvironmentIntel
+        }
+
+        if (containsAny(norm, "check server status", "server monitor", "server status")) {
+            return Command.CheckServerStatus
         }
 
         // ========================================================

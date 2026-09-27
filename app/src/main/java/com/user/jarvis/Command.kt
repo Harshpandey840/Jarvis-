@@ -36,7 +36,6 @@ sealed class Command {
 
     // Phase 3 Extensions
     object JarvisVision : Command()
-    object GamingModeOn : Command()
     object EditVideo : Command()
     object SecurityLockdown : Command()
     object LocalEnvironmentIntel : Command()
