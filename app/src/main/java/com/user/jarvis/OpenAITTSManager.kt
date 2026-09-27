@@ -14,7 +14,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
-object ElevenLabsManager {
+object OpenAITTSManager {
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -35,11 +35,10 @@ object ElevenLabsManager {
             return
         }
 
-        // Step 1: Check Key First
         val prefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("ELEVENLABS_API_KEY", null)
+        val apiKey = prefs.getString("OPENAI_TTS_API_KEY", null)
 
-        if (apiKey.isNullOrEmpty() || apiKey == "YOUR_ELEVENLABS_API_KEY") {
+        if (apiKey.isNullOrEmpty()) {
             Handler(Looper.getMainLooper()).post { fallback() }
             return
         }
@@ -47,31 +46,29 @@ object ElevenLabsManager {
         Thread {
             var tempFile: File? = null
 
-            // Step 4: Wrap in Try-Catch
             try {
-                // Step 2: Strict ElevenLabs Network Call
                 val safeText = if (text.trim().isNotEmpty()) text else "System alert."
                 val jsonBody = JSONObject()
-                jsonBody.put("text", safeText)
-                jsonBody.put("model_id", "eleven_multilingual_v2")
+                jsonBody.put("model", "tts-1")
+                jsonBody.put("voice", "onyx")
+                jsonBody.put("input", safeText)
 
                 val requestBody = jsonBody.toString()
                     .toRequestBody("application/json; charset=utf-8".toMediaType())
 
                 val request = Request.Builder()
-                    .url("https://api.elevenlabs.io/v1/text-to-speech/ErXwobaYiN019PkySvjV")
-                    .addHeader("xi-api-key", apiKey)
+                    .url("https://open-ai-text-to-speech1.p.rapidapi.com/")
+                    .addHeader("x-rapidapi-host", "open-ai-text-to-speech1.p.rapidapi.com")
+                    .addHeader("x-rapidapi-key", apiKey)
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("Accept", "audio/mpeg")
                     .post(requestBody)
                     .build()
 
                 httpClient.newCall(request).execute().use { response ->
-                    // Step 3: Handle Response
                     if (!response.isSuccessful) {
                         val errorBody = response.body?.string() ?: "No error body"
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, "ElevenLabs Error: $errorBody", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "OpenAI TTS Error: $errorBody", Toast.LENGTH_LONG).show()
                             fallback()
                         }
                         return@use

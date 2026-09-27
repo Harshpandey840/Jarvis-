@@ -34,7 +34,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.user.jarvis.ElevenLabsManager
+import com.user.jarvis.OpenAITTSManager
 
 class CommandExecutor(
     private val context: Context,
@@ -809,7 +809,7 @@ class CommandExecutor(
                         if (statusMessage.isNotBlank()) {
                             val plainStatus = statusMessage.replace(Regex("<[^>]*>"), "")
                             val finalSpeech = "Train $trainNumber is currently $plainStatus"
-                            ElevenLabsManager.speak(context, finalSpeech, {
+                            OpenAITTSManager.speak(context, finalSpeech, {
                                 Handler(Looper.getMainLooper()).post { onSpeak(finalSpeech) }
                             }, onFinished)
                         } else {

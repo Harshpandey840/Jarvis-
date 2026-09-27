@@ -429,7 +429,7 @@ class JarvisListenerService : Service() {
 
         isSpeaking = true
 
-        ElevenLabsManager.speak(this, text, fallback = {
+        OpenAITTSManager.speak(this, text, fallback = {
             tts?.speak(
                 text,
                 TextToSpeech.QUEUE_FLUSH,
