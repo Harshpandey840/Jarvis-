@@ -690,11 +690,46 @@ class CommandExecutor(
                 )
             }
 
+
+            Command.CheckServerStatus -> {
+                Thread {
+                    try {
+                        val request = Request.Builder().url("https://rajebiz.wuaze.com").build()
+                        httpClient.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                Handler(Looper.getMainLooper()).post { onSpeak("Sir, your domain rajebiz is live and running.") }
+                            } else {
+                                Handler(Looper.getMainLooper()).post { onSpeak("Sir, the server seems to be unreachable at the moment.") }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Handler(Looper.getMainLooper()).post { onSpeak("Sir, the server seems to be unreachable at the moment.") }
+                    }
+                }.start()
+            }
+
             Command.JarvisVision -> {
                 val intent = Intent(context, VisionActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
+            }
+
+
+            Command.GamingMode -> {
+                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val targetVolume = (maxVolume * 0.85).toInt()
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, AudioManager.FLAG_SHOW_UI)
+
+                val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    onSpeak("Gaming mode activated for BlackHawk. Good luck, sir.")
+                } else {
+                    onSpeak("Free Fire MAX installed nahi hai")
+                }
             }
 
             Command.GamingModeOn -> {

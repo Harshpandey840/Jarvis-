@@ -31,6 +31,8 @@ sealed class Command {
     object SilentModeOff : Command()
     object LockPhone : Command()
     object GetWeather : Command()
+    object GamingMode : Command()
+    object CheckServerStatus : Command()
 
     // Phase 3 Extensions
     object JarvisVision : Command()
