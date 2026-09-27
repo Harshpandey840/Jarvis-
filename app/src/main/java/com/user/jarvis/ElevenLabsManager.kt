@@ -54,8 +54,7 @@ object ElevenLabsManager {
                 // Step 2: Strict ElevenLabs Network Call
                 val safeText = if (text.trim().isNotEmpty()) text else "System alert."
                 val jsonBody = JSONObject()
-                jsonBody.put("text", "Hello sir, system is online.")
-                jsonBody.put("model_id", "eleven_multilingual_v2")
+                jsonBody.put("text", "hello")
 
                 val requestBody = jsonBody.toString()
                     .toRequestBody("application/json; charset=utf-8".toMediaType())
@@ -71,9 +70,9 @@ object ElevenLabsManager {
                 httpClient.newCall(request).execute().use { response ->
                     // Step 3: Handle Response
                     if (!response.isSuccessful) {
-                        val errorCode = response.code
+                        val errorBody = response.body?.string() ?: "No error body"
                         Handler(Looper.getMainLooper()).post {
-                            Toast.makeText(context, "ElevenLabs Error: $errorCode", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "ElevenLabs Error: $errorBody", Toast.LENGTH_LONG).show()
                             fallback()
                         }
                         return@use
