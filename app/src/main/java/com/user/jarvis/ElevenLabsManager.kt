@@ -54,7 +54,8 @@ object ElevenLabsManager {
                 // Step 2: Strict ElevenLabs Network Call
                 val safeText = if (text.trim().isNotEmpty()) text else "System alert."
                 val jsonBody = JSONObject()
-                jsonBody.put("text", "hello")
+                jsonBody.put("text", safeText)
+                jsonBody.put("model_id", "eleven_multilingual_v2")
 
                 val requestBody = jsonBody.toString()
                     .toRequestBody("application/json; charset=utf-8".toMediaType())
