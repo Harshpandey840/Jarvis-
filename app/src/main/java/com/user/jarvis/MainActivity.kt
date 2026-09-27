@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer.setRecognitionListener(recognitionListener)
 
-        checkElevenLabsApiKey()
+        checkOpenAITTSApiKey()
 
         permissionLauncher.launch(requiredPermissions)
 
@@ -163,22 +163,22 @@ override fun onResume() {
         }
     }
 
-    private fun checkElevenLabsApiKey() {
+    private fun checkOpenAITTSApiKey() {
         val prefs = getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        if (!prefs.contains("ELEVENLABS_API_KEY")) {
+        if (!prefs.contains("OPENAI_TTS_API_KEY")) {
             val input = EditText(this).apply {
                 inputType = InputType.TYPE_CLASS_TEXT
-                hint = "Paste ElevenLabs API Key"
+                hint = "Paste RapidAPI Key for OpenAI TTS"
             }
             AlertDialog.Builder(this)
-                .setTitle("Enter ElevenLabs API Key")
-                .setMessage("Please enter your ElevenLabs API Key for better voice:")
+                .setTitle("Enter RapidAPI Key")
+                .setMessage("Please enter your RapidAPI Key for OpenAI TTS:")
                 .setView(input)
                 .setCancelable(false)
                 .setPositiveButton("Save") { _, _ ->
                     val key = input.text.toString().trim()
                     if (key.isNotEmpty()) {
-                        prefs.edit().putString("ELEVENLABS_API_KEY", key).apply()
+                        prefs.edit().putString("OPENAI_TTS_API_KEY", key).apply()
                         Toast.makeText(this, "API Key Saved", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -553,7 +553,7 @@ override fun onResume() {
         jarvisReplyText.text = cleanText
         stateLabel.text = "Mic dabao aur bolo"
         SciFiTone.play()
-        ElevenLabsManager.speak(this, cleanText, fallback = {
+        OpenAITTSManager.speak(this, cleanText, fallback = {
             tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
         })
     }

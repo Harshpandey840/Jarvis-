@@ -112,7 +112,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun speakAndFinish(text: String) {
         runOnUiThread {
-            ElevenLabsManager.speak(this@VisionActivity, text, fallback = {
+            OpenAITTSManager.speak(this@VisionActivity, text, fallback = {
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VisionResponse")
             })
             finish()
