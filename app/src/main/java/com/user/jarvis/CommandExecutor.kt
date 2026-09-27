@@ -34,6 +34,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.user.jarvis.ElevenLabsManager
 
 class CommandExecutor(
     private val context: Context,
@@ -759,11 +760,71 @@ class CommandExecutor(
                 }.start()
             }
 
+            is Command.TrainStatus -> {
+                fetchTrainStatus(command.trainNumber, onFinished)
+            }
+
             is Command.Unknown -> {
                 onSpeak("Samajh nahi aaya")
             }
         }
     }
+
+    private fun fetchTrainStatus(trainNumber: String, onFinished: () -> Unit) {
+        val keysPrefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
+        val apiKey = keysPrefs.getString("RAPIDAPI_KEY", "") ?: ""
+        if (apiKey.isBlank()) {
+            onSpeak("RapidAPI key nahi hai")
+            return
+        }
+
+        Thread {
+            try {
+                val host = "indian-railway-irctc.p.rapidapi.com"
+                val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+                val today = dateFormat.format(Date())
+
+                val url = "https://$host/api/trains/v1/train/status" +
+                    "?train_number=$trainNumber" +
+                    "&departure_date=$today" +
+                    "&deviceIdentifier=deviceId" +
+                    "&isH5=1" +
+                    "&client=web"
+
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-rapidapi-host", host)
+                    .addHeader("x-rapidapi-key", apiKey)
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        Handler(Looper.getMainLooper()).post { onSpeak("API se response nahi mila") }
+                        return@use
+                    }
+                    val json = JSONObject(response.body?.string().orEmpty())
+                    if (json.has("body")) {
+                        val body = json.getJSONObject("body")
+                        val statusMessage = body.optString("train_status_message", "")
+                        if (statusMessage.isNotBlank()) {
+                            val plainStatus = statusMessage.replace(Regex("<[^>]*>"), "")
+                            val finalSpeech = "Train $trainNumber is currently $plainStatus"
+                            ElevenLabsManager.speak(context, finalSpeech, {
+                                Handler(Looper.getMainLooper()).post { onSpeak(finalSpeech) }
+                            }, onFinished)
+                        } else {
+                            Handler(Looper.getMainLooper()).post { onSpeak("Train ka status nahi mil paaya") }
+                        }
+                    } else {
+                        Handler(Looper.getMainLooper()).post { onSpeak("Train ka status nahi mil paaya") }
+                    }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post { onSpeak("Network error ho gaya") }
+            }
+        }.start()
+    }
+
 
     private fun fetchLocalEnvironmentIntel() {
         val apiKey = BuildConfig.GEMINI_API_KEY

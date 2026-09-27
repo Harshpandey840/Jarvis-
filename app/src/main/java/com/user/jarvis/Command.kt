@@ -33,6 +33,7 @@ sealed class Command {
     object GetWeather : Command()
     object GamingMode : Command()
     object CheckServerStatus : Command()
+    data class TrainStatus(val trainNumber: String) : Command()
 
     // Phase 3 Extensions
     object JarvisVision : Command()
