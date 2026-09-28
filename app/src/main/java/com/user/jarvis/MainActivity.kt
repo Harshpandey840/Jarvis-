@@ -108,8 +108,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer.setRecognitionListener(recognitionListener)
 
-        checkOpenAITTSApiKey()
-
         permissionLauncher.launch(requiredPermissions)
 
         micButton.setOnClickListener { startListening() }
@@ -159,29 +157,6 @@ override fun onResume() {
                 .setMessage("Apna face enroll karna hoga. Camera ke saamne seedha dekho aur OK dabao.")
                 .setPositiveButton("OK") { _, _ -> enrollFace() }
                 .setNegativeButton("Cancel", null)
-                .show()
-        }
-    }
-
-    private fun checkOpenAITTSApiKey() {
-        val prefs = getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        if (!prefs.contains("OPENAI_TTS_API_KEY")) {
-            val input = EditText(this).apply {
-                inputType = InputType.TYPE_CLASS_TEXT
-                hint = "Paste RapidAPI Key for OpenAI TTS"
-            }
-            AlertDialog.Builder(this)
-                .setTitle("Enter RapidAPI Key")
-                .setMessage("Please enter your RapidAPI Key for OpenAI TTS:")
-                .setView(input)
-                .setCancelable(false)
-                .setPositiveButton("Save") { _, _ ->
-                    val key = input.text.toString().trim()
-                    if (key.isNotEmpty()) {
-                        prefs.edit().putString("OPENAI_TTS_API_KEY", key).apply()
-                        Toast.makeText(this, "API Key Saved", Toast.LENGTH_SHORT).show()
-                    }
-                }
                 .show()
         }
     }
@@ -556,9 +531,7 @@ override fun onResume() {
         jarvisReplyText.text = cleanText
         stateLabel.text = "Mic dabao aur bolo"
         SciFiTone.play()
-        OpenAITTSManager.speak(this, cleanText, fallback = {
-            tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
-        })
+        tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
     private fun hasPermission(permission: String) =

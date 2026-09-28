@@ -74,7 +74,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+                    .url("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent")
                     .addHeader("x-goog-api-key", apiKey)
                     .post(body)
                     .build()
@@ -107,14 +107,14 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         if (status == TextToSpeech.SUCCESS) {
             tts?.language = Locale("hi", "IN")
             VoicePreferences.applySavedVoice(this, tts!!)
+            tts?.setPitch(0.78f)
+            tts?.setSpeechRate(0.98f)
         }
     }
 
     private fun speakAndFinish(text: String) {
         runOnUiThread {
-            OpenAITTSManager.speak(this@VisionActivity, text, fallback = {
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VisionResponse")
-            })
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VisionResponse")
             finish()
         }
     }
