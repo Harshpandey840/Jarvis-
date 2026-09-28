@@ -74,8 +74,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent")
-                    .addHeader("x-goog-api-key", apiKey)
+                    .url("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-001:generateContent?key=$apiKey")
                     .post(body)
                     .build()
 
