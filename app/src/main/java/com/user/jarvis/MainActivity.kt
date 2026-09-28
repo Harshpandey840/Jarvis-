@@ -453,10 +453,13 @@ override fun onResume() {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale("hi", "IN")
+            val hindiResult = tts.setLanguage(Locale("hi", "IN"))
+            if (hindiResult == TextToSpeech.LANG_MISSING_DATA || hindiResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts.setLanguage(Locale("en", "IN"))
+            }
             VoicePreferences.applySavedVoice(this, tts)
-            tts.setPitch(0.85f)
-            tts.setSpeechRate(0.95f)
+            tts.setPitch(0.78f)
+            tts.setSpeechRate(0.98f)
         }
     }
 

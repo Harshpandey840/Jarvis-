@@ -323,8 +323,8 @@ class JarvisListenerService : Service() {
                     )
                 }
 
-                tts?.setSpeechRate(1.0f)
-                tts?.setPitch(1.0f)
+                tts?.setSpeechRate(0.98f)
+                tts?.setPitch(0.78f)
 
                 tts?.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {
