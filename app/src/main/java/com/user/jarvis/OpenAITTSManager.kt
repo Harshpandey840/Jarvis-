@@ -50,7 +50,7 @@ object OpenAITTSManager {
                 val safeText = if (text.trim().isNotEmpty()) text else "System alert."
                 val jsonBody = JSONObject()
                 jsonBody.put("model", "tts-1")
-                jsonBody.put("voice", "onyx")
+                jsonBody.put("voice", "arbor")
                 jsonBody.put("input", safeText)
 
                 val requestBody = jsonBody.toString()
