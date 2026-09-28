@@ -49,7 +49,7 @@ object AiCommandParser {
                 }
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$apiKey")
+                    .url("https://generativelanguage.googleapis.com/v1/models/$MODEL:generateContent?key=$apiKey")
                     .post(body)
                     .build()
 
@@ -107,7 +107,7 @@ object AiCommandParser {
                 }
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$apiKey")
+                    .url("https://generativelanguage.googleapis.com/v1/models/$MODEL:generateContent?key=$apiKey")
                     .post(body)
                     .build()
                 client.newCall(request).execute().use { response ->

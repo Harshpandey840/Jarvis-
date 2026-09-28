@@ -34,7 +34,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import com.user.jarvis.OpenAITTSManager
 
 class CommandExecutor(
     private val context: Context,
@@ -809,9 +808,10 @@ class CommandExecutor(
                         if (statusMessage.isNotBlank()) {
                             val plainStatus = statusMessage.replace(Regex("<[^>]*>"), "")
                             val finalSpeech = "Train $trainNumber is currently $plainStatus"
-                            OpenAITTSManager.speak(context, finalSpeech, {
-                                Handler(Looper.getMainLooper()).post { onSpeak(finalSpeech) }
-                            }, onFinished)
+                            Handler(Looper.getMainLooper()).post {
+                                onSpeak(finalSpeech)
+                                onFinished()
+                            }
                         } else {
                             Handler(Looper.getMainLooper()).post { onSpeak("Train ka status nahi mil paaya") }
                         }
@@ -845,7 +845,7 @@ class CommandExecutor(
                 }
                 val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val request = okhttp3.Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent")
+                    .url("https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent")
                     .addHeader("x-goog-api-key", apiKey)
                     .post(body)
                     .build()
