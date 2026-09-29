@@ -25,6 +25,7 @@ import android.os.Looper
 import android.provider.AlarmClock
 import android.provider.ContactsContract
 import android.provider.Settings
+import android.util.Log
 import androidx.core.content.ContextCompat
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -828,6 +829,7 @@ class CommandExecutor(
 
     private fun fetchLocalEnvironmentIntel() {
         val apiKey = ApiKeyManager.getGroqApiKey(context)
+        Log.d("GroqAPI", "Key length: ${apiKey.length}, value: '$apiKey'")
         if (apiKey.isBlank()) {
             onSpeak("API key nahi hai")
             return
@@ -852,6 +854,8 @@ class CommandExecutor(
                     .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
+
+                Log.d("GroqAPI", "Request headers: ${request.headers}")
 
                 httpClient.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()

@@ -47,6 +47,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val base64Image = Base64.getEncoder().encodeToString(byteArray)
 
         val apiKey = ApiKeyManager.getGroqApiKey(this)
+        Log.d("GroqAPI", "Key length: ${apiKey.length}, value: '$apiKey'")
         if (apiKey.isBlank()) {
             speakAndFinish("API key nahi hai")
             return
@@ -77,6 +78,8 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
+
+                Log.d("GroqAPI", "Request headers: ${request.headers}")
 
                 client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()

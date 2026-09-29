@@ -2,6 +2,7 @@ package com.user.jarvis
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -27,6 +28,7 @@ object AiCommandParser {
     private const val SYSTEM_PROMPT = "You are Jarvis, an advanced personal AI assistant. Reply in natural, conversational, and fluent Hindi/Hinglish like a real human friend, keeping responses concise and engaging. When something is genuinely important (a warning, a deadline, a key number, a risk), wrap that short phrase — at most one or two words, never a whole sentence — in double asterisks like **this**, used sparingly, at most once or twice per reply. The user speaks Hindi/English mixed (Hinglish); mirror that naturally in your spoken replies rather than switching to pure English or pure Hindi. You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, translation, calculation, unit conversion, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, share_notes, share_todos, create_contact, get_weather, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, vision, chat, train_status\", \"target\": \"app name, contact name, or empty\", \"text\": \"message text, search query, todo item, clipboard text, phone number digits for create_contact, train number (5 digits) for train_status, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related, \"recurring\": true if the user wants a reminder repeated every day, otherwise false}. For device commands, keep the spoken confirmation short — one clause, not a sentence. Use set_reminder when the user asks to be reminded of something at a specific time — put the reminder content in text, compute correct hour/minute/day_offset from the current date and time given to you, and set recurring true only if they said daily/roz/hamesha. For create_contact put the contact name in target and phone digits in text. For get_weather, only use it if a live current weather lookup makes sense; for translation, calculation, or unit conversion, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences, precise, no fluff). Output only the JSON object."
 
     fun parse(spokenText: String, apiKey: String, onResult: (Command) -> Unit) {
+        Log.d("GroqAPI", "Key length: ${apiKey.length}, value: '$apiKey'")
         if (apiKey.isBlank()) {
             onResult(Command.ChatReply("API key khaali hai, secret check karo"))
             return
@@ -60,6 +62,8 @@ object AiCommandParser {
                     .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
+
+                Log.d("GroqAPI", "Request headers: ${request.headers}")
 
                 client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()
@@ -95,6 +99,7 @@ object AiCommandParser {
     }
 
     fun summarizeText(text: String, apiKey: String, onResult: (String) -> Unit) {
+        Log.d("GroqAPI", "Key length: ${apiKey.length}, value: '$apiKey'")
         if (apiKey.isBlank()) {
             onResult("API key khaali hai")
             return
@@ -119,6 +124,7 @@ object AiCommandParser {
                     .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
+                Log.d("GroqAPI", "Request headers: ${request.headers}")
                 client.newCall(request).execute().use { response ->
                     val responseText = response.body?.string().orEmpty()
                     val root = JSONObject(responseText)
