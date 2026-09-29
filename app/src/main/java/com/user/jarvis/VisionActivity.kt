@@ -46,7 +46,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val byteArray = stream.toByteArray()
         val base64Image = Base64.getEncoder().encodeToString(byteArray)
 
-        val apiKey = BuildConfig.GROQ_API_KEY
+        val apiKey = ApiKeyManager.getGroqApiKey(this)
         if (apiKey.isBlank()) {
             speakAndFinish("API key nahi hai")
             return

@@ -60,7 +60,7 @@ class CommandExecutor(
         } else {
             AiCommandParser.parse(
                 spokenText,
-                BuildConfig.GROQ_API_KEY
+                ApiKeyManager.getGroqApiKey(context)
             ) { aiCommand ->
                 runCommand(aiCommand)
             }
@@ -827,7 +827,7 @@ class CommandExecutor(
 
 
     private fun fetchLocalEnvironmentIntel() {
-        val apiKey = BuildConfig.GROQ_API_KEY
+        val apiKey = ApiKeyManager.getGroqApiKey(context)
         if (apiKey.isBlank()) {
             onSpeak("API key nahi hai")
             return
