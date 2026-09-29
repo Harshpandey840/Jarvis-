@@ -46,7 +46,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val byteArray = stream.toByteArray()
         val base64Image = Base64.getEncoder().encodeToString(byteArray)
 
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = BuildConfig.GROQ_API_KEY
         if (apiKey.isBlank()) {
             speakAndFinish("API key nahi hai")
             return
@@ -56,25 +56,25 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             try {
                 val prompt = "Briefly describe this image"
 
-                val inlineData = JSONObject().apply {
-                    put("mimeType", "image/jpeg")
-                    put("data", base64Image)
-                }
-
-                val partImage = JSONObject().apply { put("inlineData", inlineData) }
-                val partText = JSONObject().apply { put("text", prompt) }
-
                 val requestJson = JSONObject().apply {
-                    put("contents", JSONArray().put(
-                        JSONObject().apply {
-                            put("parts", JSONArray().put(partText).put(partImage))
-                        }
-                    ))
+                    put("model", "llama-3.3-70b-versatile")
+                    put("temperature", 0.7)
+                    put("messages", JSONArray()
+                        .put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", "You are Jarvis. Since the vision sensor is currently offline and running on Groq Llama 3.3, respond playfully in short Hinglish saying that the vision sensor is currently upgrading but you are here.")
+                        })
+                        .put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    )
                 }
 
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                    .url("https://api.groq.com/openai/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
 
@@ -87,12 +87,10 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         return@use
                     }
 
-                    val rawText = root.getJSONArray("candidates")
+                    val rawText = root.getJSONArray("choices")
                         .getJSONObject(0)
-                        .getJSONObject("content")
-                        .getJSONArray("parts")
-                        .getJSONObject(0)
-                        .getString("text")
+                        .getJSONObject("message")
+                        .getString("content")
 
                     speakAndFinish(rawText.trim())
                 }
