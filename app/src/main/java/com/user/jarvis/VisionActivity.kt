@@ -57,7 +57,7 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 val prompt = "Briefly describe this image"
 
                 val requestJson = JSONObject().apply {
-                    put("model", "llama-3.1-70b-versatile")
+                    put("model", "llama-3.1-8b-instant")
                     put("temperature", 0.7)
                     put("messages", JSONArray()
                         .put(JSONObject().apply {
