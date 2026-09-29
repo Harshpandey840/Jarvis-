@@ -54,7 +54,7 @@ object AiCommandParser {
                         })
                     )
                 }
-                val body = requestJson.toString().toRequestBody("application/json".toMediaType())
+                val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val request = Request.Builder()
                     .url("https://api.groq.com/openai/v1/chat/completions")
                     .addHeader("Authorization", "Bearer $apiKey")
@@ -113,7 +113,7 @@ object AiCommandParser {
                         })
                     )
                 }
-                val body = requestJson.toString().toRequestBody("application/json".toMediaType())
+                val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val request = Request.Builder()
                     .url("https://api.groq.com/openai/v1/chat/completions")
                     .addHeader("Authorization", "Bearer $apiKey")
