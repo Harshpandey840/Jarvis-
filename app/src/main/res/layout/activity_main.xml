@@ -30,7 +30,7 @@
         android:paddingEnd="14dp"
         android:paddingTop="6dp"
         android:paddingBottom="6dp"
-        app:layout_constraintTop_toBottomOf="@id/titleText"
+        app:layout_constraintTop_toBottomOf="@id/secondaryButtonsRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp">
@@ -183,8 +183,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/transcriptCard"
-        app:layout_constraintBottom_toTopOf="@id/jarvisToggleButton"
+        app:layout_constraintTop_toBottomOf="@id/titleText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="10dp">
@@ -256,6 +255,7 @@
         android:layout_marginStart="28dp"
         android:layout_marginEnd="28dp"
         android:layout_marginBottom="26dp"
+        android:layout_marginTop="20dp"
         android:text="  START JARVIS · ALWAYS ON"
         android:textSize="11sp"
         android:letterSpacing="0.06"
@@ -264,6 +264,7 @@
         android:drawableStart="@drawable/ic_power"
         android:drawablePadding="8dp"
         android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/transcriptCard"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

@@ -139,6 +139,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             val input = EditText(this).apply {
                 hint = "Enter Groq API Key"
                 setText(currentKey)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setPadding(50, 50, 50, 50)
             }
             AlertDialog.Builder(this)
                 .setTitle(if (currentKey.isBlank()) "API Key Required" else "Update API Key")
