@@ -147,12 +147,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .setCancelable(!currentKey.isBlank() && force)
                 .setPositiveButton("Save") { _, _ ->
                     val newKey = input.text.toString().trim()
-                    if (newKey.isNotBlank()) {
+                    if (newKey.isNotBlank() && newKey.startsWith("gsk_")) {
                         ApiKeyManager.setGroqApiKey(this, newKey)
                         Toast.makeText(this, "API Key saved", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(this, "Key cannot be empty", Toast.LENGTH_SHORT).show()
-                        checkAndPromptApiKey(force) // Prompt again if empty
+                        Toast.makeText(this, "Invalid Key! Must start with gsk_", Toast.LENGTH_SHORT).show()
+                        checkAndPromptApiKey(force) // Prompt again if empty or invalid
                     }
                 }
                 .apply {
