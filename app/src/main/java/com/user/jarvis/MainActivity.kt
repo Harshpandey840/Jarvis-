@@ -126,6 +126,33 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 startActivity(intent)
             } catch (e: Exception) { }
         }
+
+        checkAndPromptApiKey()
+    }
+
+    private fun checkAndPromptApiKey() {
+        val currentKey = ApiKeyManager.getGroqApiKey(this)
+        if (currentKey.isBlank()) {
+            val input = EditText(this).apply {
+                hint = "Enter Groq API Key"
+            }
+            AlertDialog.Builder(this)
+                .setTitle("API Key Required")
+                .setMessage("Please enter your Groq API key to use Jarvis AI features.")
+                .setView(input)
+                .setCancelable(false)
+                .setPositiveButton("Save") { _, _ ->
+                    val newKey = input.text.toString().trim()
+                    if (newKey.isNotBlank()) {
+                        ApiKeyManager.setGroqApiKey(this, newKey)
+                        Toast.makeText(this, "API Key saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Key cannot be empty", Toast.LENGTH_SHORT).show()
+                        checkAndPromptApiKey() // Prompt again if empty
+                    }
+                }
+                .show()
+        }
     }
 override fun onResume() {
         super.onResume()
@@ -249,7 +276,7 @@ override fun onResume() {
                 return
             }
             stateLabel.text = "Summarize kar raha hoon..."
-            AiCommandParser.summarizeText(text, BuildConfig.GROQ_API_KEY) { summary ->
+            AiCommandParser.summarizeText(text, ApiKeyManager.getGroqApiKey(this)) { summary ->
                 youSaidText.text = "[File summary]"
                 speak(summary)
             }
@@ -532,6 +559,10 @@ override fun onResume() {
         stateLabel.text = "Mic dabao aur bolo"
         SciFiTone.play()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
+
+        if (cleanText.contains("API key khaali hai", ignoreCase = true)) {
+            checkAndPromptApiKey()
+        }
     }
 
     private fun hasPermission(permission: String) =
