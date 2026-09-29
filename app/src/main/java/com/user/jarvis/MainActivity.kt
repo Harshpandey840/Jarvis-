@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var notesListButton: TextView
     private lateinit var fileSummaryButton: TextView
     private lateinit var securityModeButton: TextView
+    private lateinit var apiKeyButton: TextView
     private lateinit var jarvisToggleButton: Button
 
     private lateinit var commandExecutor: CommandExecutor
@@ -95,6 +96,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton = findViewById(R.id.notesListButton)
         fileSummaryButton = findViewById(R.id.fileSummaryButton)
         securityModeButton = findViewById(R.id.securityModeButton)
+        apiKeyButton = findViewById(R.id.apiKeyButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
@@ -116,6 +118,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
         fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
         securityModeButton.setOnClickListener { onSecurityModeClicked() }
+        apiKeyButton.setOnClickListener { checkAndPromptApiKey(force = true) }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
@@ -130,17 +133,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         checkAndPromptApiKey()
     }
 
-    private fun checkAndPromptApiKey() {
+    private fun checkAndPromptApiKey(force: Boolean = false) {
         val currentKey = ApiKeyManager.getGroqApiKey(this)
-        if (currentKey.isBlank()) {
+        if (currentKey.isBlank() || force) {
             val input = EditText(this).apply {
                 hint = "Enter Groq API Key"
+                setText(currentKey)
             }
             AlertDialog.Builder(this)
-                .setTitle("API Key Required")
+                .setTitle(if (currentKey.isBlank()) "API Key Required" else "Update API Key")
                 .setMessage("Please enter your Groq API key to use Jarvis AI features.")
                 .setView(input)
-                .setCancelable(false)
+                .setCancelable(!currentKey.isBlank() && force)
                 .setPositiveButton("Save") { _, _ ->
                     val newKey = input.text.toString().trim()
                     if (newKey.isNotBlank()) {
@@ -148,7 +152,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         Toast.makeText(this, "API Key saved", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this, "Key cannot be empty", Toast.LENGTH_SHORT).show()
-                        checkAndPromptApiKey() // Prompt again if empty
+                        checkAndPromptApiKey(force) // Prompt again if empty
+                    }
+                }
+                .apply {
+                    if (force && currentKey.isNotBlank()) {
+                        setNegativeButton("Cancel", null)
                     }
                 }
                 .show()
