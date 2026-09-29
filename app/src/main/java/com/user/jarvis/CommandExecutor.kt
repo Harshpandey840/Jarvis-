@@ -60,7 +60,7 @@ class CommandExecutor(
         } else {
             AiCommandParser.parse(
                 spokenText,
-                BuildConfig.GEMINI_API_KEY
+                BuildConfig.GROQ_API_KEY
             ) { aiCommand ->
                 runCommand(aiCommand)
             }
@@ -827,7 +827,7 @@ class CommandExecutor(
 
 
     private fun fetchLocalEnvironmentIntel() {
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = BuildConfig.GROQ_API_KEY
         if (apiKey.isBlank()) {
             onSpeak("API key nahi hai")
             return
@@ -837,15 +837,19 @@ class CommandExecutor(
             try {
                 val prompt = "The user is currently in Arma, Lakhisarai, Bihar, India. Provide a very brief, realistic current weather estimation and local intel for this location."
                 val requestJson = org.json.JSONObject().apply {
-                    put("contents", org.json.JSONArray().put(
-                        org.json.JSONObject().apply {
-                            put("parts", org.json.JSONArray().put(org.json.JSONObject().apply { put("text", prompt) }))
-                        }
-                    ))
+                    put("model", "llama-3.3-70b-versatile")
+                    put("temperature", 0.7)
+                    put("messages", org.json.JSONArray()
+                        .put(org.json.JSONObject().apply {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    )
                 }
                 val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
                 val request = okhttp3.Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                    .url("https://api.groq.com/openai/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
 
@@ -857,9 +861,9 @@ class CommandExecutor(
                         Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
                         return@use
                     }
-                    val rawText = root.getJSONArray("candidates")
-                        .getJSONObject(0).getJSONObject("content")
-                        .getJSONArray("parts").getJSONObject(0).getString("text")
+                    val rawText = root.getJSONArray("choices")
+                        .getJSONObject(0).getJSONObject("message")
+                        .getString("content")
                     Handler(Looper.getMainLooper()).post { onSpeak(rawText.trim()) }
                 }
             } catch (e: Exception) {

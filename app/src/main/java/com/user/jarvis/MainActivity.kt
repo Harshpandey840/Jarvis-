@@ -249,7 +249,7 @@ override fun onResume() {
                 return
             }
             stateLabel.text = "Summarize kar raha hoon..."
-            AiCommandParser.summarizeText(text, BuildConfig.GEMINI_API_KEY) { summary ->
+            AiCommandParser.summarizeText(text, BuildConfig.GROQ_API_KEY) { summary ->
                 youSaidText.text = "[File summary]"
                 speak(summary)
             }

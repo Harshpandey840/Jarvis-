@@ -21,7 +21,7 @@ object AiCommandParser {
         .build()
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private const val MODEL = "gemini-1.5-flash"
+    private const val MODEL = "llama-3.3-70b-versatile"
     private val history = mutableListOf<Pair<String, String>>()
 
     private const val SYSTEM_PROMPT = "You are Jarvis, an advanced personal AI assistant. Reply in natural, conversational, and fluent Hindi/Hinglish like a real human friend, keeping responses concise and engaging. When something is genuinely important (a warning, a deadline, a key number, a risk), wrap that short phrase — at most one or two words, never a whole sentence — in double asterisks like **this**, used sparingly, at most once or twice per reply. The user speaks Hindi/English mixed (Hinglish); mirror that naturally in your spoken replies rather than switching to pure English or pure Hindi. You are given the current date and time and recent conversation history for context. First decide: is this a DEVICE COMMAND or GENERAL TALK (question, greeting, chit-chat, translation, calculation, unit conversion, follow-up question)? Respond with ONE JSON object ONLY, no markdown fences, no explanation outside the JSON. Format: {\"action\": \"one of open_app, call, message, whatsapp, search, play_song, set_alarm, set_reminder, add_todo, read_todos, save_note, read_notes, read_clipboard, write_clipboard, share_notes, share_todos, create_contact, get_weather, tell_time, tell_battery, volume_up, volume_down, flashlight_on, flashlight_off, wifi_settings, bluetooth_settings, silent_on, silent_off, lock_phone, vision, chat, train_status\", \"target\": \"app name, contact name, or empty\", \"text\": \"message text, search query, todo item, clipboard text, phone number digits for create_contact, train number (5 digits) for train_status, or your natural short spoken reply if action is chat\", \"hour\": hour 0-23 or -1, \"minute\": minute 0-59 or -1, \"day_offset\": 0 for today, 1 for tomorrow, 2 for day after, or -1 if not time related, \"recurring\": true if the user wants a reminder repeated every day, otherwise false}. For device commands, keep the spoken confirmation short — one clause, not a sentence. Use set_reminder when the user asks to be reminded of something at a specific time — put the reminder content in text, compute correct hour/minute/day_offset from the current date and time given to you, and set recurring true only if they said daily/roz/hamesha. For create_contact put the contact name in target and phone digits in text. For get_weather, only use it if a live current weather lookup makes sense; for translation, calculation, or unit conversion, use action chat and give your best real specific answer in text (1-3 short spoken Hinglish sentences, precise, no fluff). Output only the JSON object."
@@ -41,15 +41,23 @@ object AiCommandParser {
                     "User said: \"$spokenText\""
 
                 val requestJson = JSONObject().apply {
-                    put("contents", JSONArray().put(
-                        JSONObject().apply {
-                            put("parts", JSONArray().put(JSONObject().apply { put("text", prompt) }))
-                        }
-                    ))
+                    put("model", MODEL)
+                    put("temperature", 0.7)
+                    put("messages", JSONArray()
+                        .put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", "$SYSTEM_PROMPT\n\nCurrent date and time: $nowStr.\n\n$historyText")
+                        })
+                        .put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", spokenText)
+                        })
+                    )
                 }
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$apiKey")
+                    .url("https://api.groq.com/openai/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
 
@@ -62,18 +70,15 @@ object AiCommandParser {
                         mainHandler.post { onResult(Command.ChatReply("API error: $message")) }
                         return@use
                     }
-                    if (!root.has("candidates")) {
-                        val blockReason = root.optJSONObject("promptFeedback")?.optString("blockReason", "no reason")
-                        mainHandler.post { onResult(Command.ChatReply("AI ne jawab nahi diya: ${blockReason ?: "unknown"}")) }
+                    if (!root.has("choices")) {
+                        mainHandler.post { onResult(Command.ChatReply("AI ne jawab nahi diya")) }
                         return@use
                     }
 
-                    val rawText = root.getJSONArray("candidates")
+                    val rawText = root.getJSONArray("choices")
                         .getJSONObject(0)
-                        .getJSONObject("content")
-                        .getJSONArray("parts")
-                        .getJSONObject(0)
-                        .getString("text")
+                        .getJSONObject("message")
+                        .getString("content")
                     val cleaned = rawText.trim()
                         .removePrefix("```json").removePrefix("```")
                         .removeSuffix("```").trim()
@@ -99,15 +104,19 @@ object AiCommandParser {
                 val truncated = if (text.length > 6000) text.substring(0, 6000) else text
                 val prompt = "Summarize this text in 3-4 short Hinglish spoken sentences, plain text only, no markdown:\n\n$truncated"
                 val requestJson = JSONObject().apply {
-                    put("contents", JSONArray().put(
-                        JSONObject().apply {
-                            put("parts", JSONArray().put(JSONObject().apply { put("text", prompt) }))
-                        }
-                    ))
+                    put("model", MODEL)
+                    put("temperature", 0.7)
+                    put("messages", JSONArray()
+                        .put(JSONObject().apply {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    )
                 }
                 val body = requestJson.toString().toRequestBody("application/json".toMediaType())
                 val request = Request.Builder()
-                    .url("https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$apiKey")
+                    .url("https://api.groq.com/openai/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $apiKey")
                     .post(body)
                     .build()
                 client.newCall(request).execute().use { response ->
@@ -118,9 +127,9 @@ object AiCommandParser {
                         mainHandler.post { onResult("API error: $message") }
                         return@use
                     }
-                    val rawText = root.getJSONArray("candidates")
-                        .getJSONObject(0).getJSONObject("content")
-                        .getJSONArray("parts").getJSONObject(0).getString("text")
+                    val rawText = root.getJSONArray("choices")
+                        .getJSONObject(0).getJSONObject("message")
+                        .getString("content")
                     mainHandler.post { onResult(rawText.trim()) }
                 }
             } catch (e: Exception) {
