@@ -25,8 +25,11 @@ import android.speech.tts.TextToSpeech
 import android.text.InputType
 import android.view.View
 import android.view.animation.LinearInterpolator
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -49,14 +52,19 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var stateLabel: TextView
     private lateinit var youSaidText: TextView
     private lateinit var jarvisReplyText: TextView
+    private lateinit var chatScrollView: ScrollView
+    private lateinit var chatContainer: LinearLayout
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
-    private lateinit var voiceSettingsButton: TextView
-    private lateinit var notesListButton: TextView
-    private lateinit var fileSummaryButton: TextView
-    private lateinit var securityModeButton: TextView
+    private lateinit var voiceSettingsButton: View
+    private lateinit var notesListButton: View
+    private lateinit var fileSummaryButton: View
+    private lateinit var securityModeButton: View
+    private lateinit var apiKeyButton: View
     private lateinit var jarvisToggleButton: Button
+    private lateinit var particleOrb: ParticleSphereView
+    private lateinit var micGlow: View
 
     private lateinit var commandExecutor: CommandExecutor
     private var isJarvisRunning = false
@@ -88,6 +96,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stateLabel = findViewById(R.id.stateLabel)
         youSaidText = findViewById(R.id.youSaidText)
         jarvisReplyText = findViewById(R.id.jarvisReplyText)
+        chatScrollView = findViewById(R.id.chatScrollView)
+        chatContainer = findViewById(R.id.chatContainer)
         statusDot = findViewById(R.id.statusDot)
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
@@ -95,7 +105,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton = findViewById(R.id.notesListButton)
         fileSummaryButton = findViewById(R.id.fileSummaryButton)
         securityModeButton = findViewById(R.id.securityModeButton)
+        apiKeyButton = findViewById(R.id.apiKeyButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
+        particleOrb = findViewById(R.id.particleOrb)
+        micGlow = findViewById(R.id.micGlow)
+
+        youSaidText.visibility = View.INVISIBLE
+        jarvisReplyText.visibility = View.INVISIBLE
+
+        // Hidden elements mapped to preserve compatibility without crashing
+        statusDot.visibility = View.GONE
+        statusLabel.visibility = View.GONE
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
 
@@ -116,6 +136,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
         fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
         securityModeButton.setOnClickListener { onSecurityModeClicked() }
+        apiKeyButton.setOnClickListener { checkAndPromptApiKey(force = true) }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
@@ -125,6 +146,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             try {
                 startActivity(intent)
             } catch (e: Exception) { }
+        }
+
+        checkAndPromptApiKey()
+    }
+
+    private fun checkAndPromptApiKey(force: Boolean = false) {
+        val currentKey = ApiKeyManager.getGroqApiKey(this)
+        if (currentKey.isBlank() || force) {
+            val input = EditText(this).apply {
+                hint = "Enter Groq API Key"
+                setText(currentKey)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setPadding(50, 50, 50, 50)
+            }
+            AlertDialog.Builder(this)
+                .setTitle(if (currentKey.isBlank()) "API Key Required" else "Update API Key")
+                .setMessage("Please enter your Groq API key to use Jarvis AI features.")
+                .setView(input)
+                .setCancelable(!currentKey.isBlank() && force)
+                .setPositiveButton("Save") { _, _ ->
+                    val newKey = input.text.toString().trim()
+                    if (newKey.isNotBlank() && newKey.startsWith("gsk_")) {
+                        ApiKeyManager.setGroqApiKey(this, newKey)
+                        Toast.makeText(this, "API Key saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Invalid Key! Must start with gsk_", Toast.LENGTH_SHORT).show()
+                        checkAndPromptApiKey(force) // Prompt again if empty or invalid
+                    }
+                }
+                .apply {
+                    if (force && currentKey.isNotBlank()) {
+                        setNegativeButton("Cancel", null)
+                    }
+                }
+                .show()
         }
     }
 override fun onResume() {
@@ -249,8 +305,8 @@ override fun onResume() {
                 return
             }
             stateLabel.text = "Summarize kar raha hoon..."
-            AiCommandParser.summarizeText(text, BuildConfig.GEMINI_API_KEY) { summary ->
-                youSaidText.text = "[File summary]"
+            AiCommandParser.summarizeText(text, ApiKeyManager.getGroqApiKey(this)) { summary ->
+                addChatMessage("[File summary]", true)
                 speak(summary)
             }
         } catch (e: Exception) {
@@ -282,29 +338,10 @@ override fun onResume() {
     // ---------- Orb pulse animation ----------
 
     private fun setupPulseAnimation() {
-        pulseView(findViewById(R.id.pulseRingOuter), 0L)
-        pulseView(findViewById(R.id.pulseRingInner), 800L)
+        // Pulse animation is now handled internally by ParticleSphereView
+        // through its continuous 3D rotation, and dynamic RMS scaling in onRmsChanged.
     }
-
-    private fun pulseView(view: View, delay: Long) {
-        view.alpha = 0f
-        val scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.55f, 0f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        AnimatorSet().apply {
-            playTogether(scaleX, scaleY, alpha)
-            duration = 1700
-            startDelay = delay
-            interpolator = LinearInterpolator()
-            start()
-        }
-    }// ---------- PIN lock + intruder security ----------
+    // ---------- PIN lock + intruder security ----------
 
     private fun lockUiUntilPinVerified() {
         micButton.isEnabled = false
@@ -428,10 +465,13 @@ override fun onResume() {
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
-            tts.language = Locale("hi", "IN")
+            val hindiResult = tts.setLanguage(Locale("hi", "IN"))
+            if (hindiResult == TextToSpeech.LANG_MISSING_DATA || hindiResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts.setLanguage(Locale("en", "IN"))
+            }
             VoicePreferences.applySavedVoice(this, tts)
-            tts.setPitch(0.85f)
-            tts.setSpeechRate(0.95f)
+            tts.setPitch(0.78f)
+            tts.setSpeechRate(0.98f)
         }
     }
 
@@ -446,7 +486,7 @@ override fun onResume() {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
         }
-        stateLabel.text = "Sun raha hoon..."
+        stateLabel.text = "Listening..."
         speechRecognizer.startListening(intent)
     }
 
@@ -455,23 +495,24 @@ override fun onResume() {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val spokenText = matches?.firstOrNull().orEmpty()
             if (spokenText.isNotBlank()) {
-                youSaidText.text = spokenText
-                stateLabel.text = "Soch raha hoon..."
+                addChatMessage(spokenText, true)
+                stateLabel.text = "Thinking..."
                 commandExecutor.execute(spokenText)
             } else {
-                stateLabel.text = "Mic dabao aur bolo"
+                stateLabel.text = "Just Say It."
             }
         }
-        override fun onError(error: Int) { stateLabel.text = "Samajh nahi aaya, phir bolo" }
+        override fun onError(error: Int) { stateLabel.text = "Just Say It." }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {
             val scale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.5f
-            findViewById<View>(R.id.micButton).animate()
+            micButton.animate()
                 .scaleX(scale)
                 .scaleY(scale)
                 .setDuration(50)
                 .start()
+            particleOrb.pulseScale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.2f
         }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
@@ -491,7 +532,7 @@ override fun onResume() {
             }
             startService(stopIntent)
             isJarvisRunning = false
-            jarvisToggleButton.text = "  START JARVIS · ALWAYS ON"
+            jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_play, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
             statusLabel.text = "STANDBY"
         } else {
@@ -500,7 +541,7 @@ override fun onResume() {
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
             isJarvisRunning = true
-            jarvisToggleButton.text = "  STOP JARVIS"
+            jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_pause, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
             statusLabel.text = "ALWAYS ON"
         }
@@ -525,10 +566,38 @@ override fun onResume() {
 
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
-        jarvisReplyText.text = cleanText
-        stateLabel.text = "Mic dabao aur bolo"
+        addChatMessage(cleanText, false)
+        stateLabel.text = "Jarvis is speaking"
         SciFiTone.play()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
+
+        if (cleanText.contains("API key khaali hai", ignoreCase = true)) {
+            checkAndPromptApiKey()
+        }
+    }
+
+    private fun addChatMessage(text: String, isUser: Boolean) {
+        val textView = TextView(this).apply {
+            this.text = text
+            setTextColor(getColorCompat(R.color.text_primary))
+            textSize = 14f
+
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = if (isUser) Gravity.END else Gravity.START
+                bottomMargin = 24
+            }
+            layoutParams = params
+
+            val bgResId = if (isUser) R.drawable.bg_chat_user else R.drawable.bg_chat_jarvis
+            background = ContextCompat.getDrawable(this@MainActivity, bgResId)
+        }
+        chatContainer.addView(textView)
+        chatScrollView.post {
+            chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
+        }
     }
 
     private fun hasPermission(permission: String) =

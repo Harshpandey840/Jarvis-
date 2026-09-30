@@ -1,25 +1,27 @@
 <resources>
-    <!-- Obsidian Dark Theme Colors -->
-    <color name="bg_obsidian">#09090B</color>
-    <color name="surface_card">#1C1C24</color>
+    <!-- New Obsidian Dark Theme Colors -->
+    <color name="bg_obsidian">#09090F</color>
+    <color name="surface_card">#15151D</color>
+    <color name="chat_bubble">#191922</color>
 
     <!-- Accent Colors -->
-    <color name="accent_primary">#8585FF</color>
+    <color name="accent_primary">#A5A5FF</color>
+    <color name="accent_secondary">#7765F5</color>
     <color name="accent_primary_dim">#5E5EA6</color>
-    <color name="accent_glow">#408585FF</color>
+    <color name="accent_glow">#40A5A5FF</color>
 
     <!-- Text Colors -->
     <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#8B98A5</color>
+    <color name="text_secondary">#A0A0AA</color>
 
     <!-- Status / Action Colors -->
     <color name="accent_online_green">#00E676</color>
     <color name="accent_offline_gray">#5A6672</color>
     <color name="stop_red">#FF5252</color>
 
-    <!-- Old variables to keep compatibility in case anything else uses them (or we can safely remove them in activity_main replacement) -->
-    <color name="bg_dark">#09090B</color>
-    <color name="bg_dark_alt">#12181F</color>
-    <color name="accent_cyan">#8585FF</color>
+    <!-- Old variables to keep compatibility -->
+    <color name="bg_dark">#09090F</color>
+    <color name="bg_dark_alt">#15151D</color>
+    <color name="accent_cyan">#A5A5FF</color>
     <color name="accent_cyan_dim">#5E5EA6</color>
 </resources>
