@@ -880,7 +880,7 @@ class CommandExecutor(
                 }
             } catch (e: Exception) {
                 Log.e("TrainAPI", "Network/Parse error in fetchTrainsBetweenStations", e)
-                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Unknown Error") }
+                Handler(Looper.getMainLooper()).post { onSpeak("Network error ho gaya") }
             }
         }.start()
     }
@@ -976,7 +976,7 @@ class CommandExecutor(
                 }
             } catch (e: Exception) {
                 Log.e("TrainAPI", "Network exception in fetchTrainStatus", e)
-                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Unknown Error") }
+                Handler(Looper.getMainLooper()).post { onSpeak("Network error ho gaya") }
             }
         }.start()
     }
