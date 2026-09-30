@@ -1,12 +1,25 @@
 <resources>
-    <color name="bg_dark">#0A0E14</color>
-    <color name="bg_dark_alt">#12181F</color>
-    <color name="accent_cyan">#00E5FF</color>
-    <color name="accent_cyan_dim">#0097A7</color>
+    <!-- Obsidian Dark Theme Colors -->
+    <color name="bg_obsidian">#09090B</color>
+    <color name="surface_card">#1C1C24</color>
+
+    <!-- Accent Colors -->
+    <color name="accent_primary">#8585FF</color>
+    <color name="accent_primary_dim">#5E5EA6</color>
+    <color name="accent_glow">#408585FF</color>
+
+    <!-- Text Colors -->
     <color name="text_primary">#FFFFFF</color>
     <color name="text_secondary">#8B98A5</color>
-    <color name="surface_card">#161C24</color>
-<color name="stop_red">#FF5252</color>
+
+    <!-- Status / Action Colors -->
     <color name="accent_online_green">#00E676</color>
     <color name="accent_offline_gray">#5A6672</color>
+    <color name="stop_red">#FF5252</color>
+
+    <!-- Old variables to keep compatibility in case anything else uses them (or we can safely remove them in activity_main replacement) -->
+    <color name="bg_dark">#09090B</color>
+    <color name="bg_dark_alt">#12181F</color>
+    <color name="accent_cyan">#8585FF</color>
+    <color name="accent_cyan_dim">#5E5EA6</color>
 </resources>

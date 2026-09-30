@@ -52,12 +52,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
-    private lateinit var voiceSettingsButton: TextView
-    private lateinit var notesListButton: TextView
-    private lateinit var fileSummaryButton: TextView
-    private lateinit var securityModeButton: TextView
-    private lateinit var apiKeyButton: TextView
+    private lateinit var voiceSettingsButton: View
+    private lateinit var notesListButton: View
+    private lateinit var fileSummaryButton: View
+    private lateinit var securityModeButton: View
+    private lateinit var apiKeyButton: View
     private lateinit var jarvisToggleButton: Button
+    private lateinit var particleOrb: ParticleSphereView
+    private lateinit var micGlow: View
 
     private lateinit var commandExecutor: CommandExecutor
     private var isJarvisRunning = false
@@ -98,6 +100,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         securityModeButton = findViewById(R.id.securityModeButton)
         apiKeyButton = findViewById(R.id.apiKeyButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
+        particleOrb = findViewById(R.id.particleOrb)
+        micGlow = findViewById(R.id.micGlow)
+
+        youSaidText.visibility = View.INVISIBLE
+        jarvisReplyText.visibility = View.INVISIBLE
+
+        // Hidden elements mapped to preserve compatibility without crashing
+        statusDot.visibility = View.GONE
+        statusLabel.visibility = View.GONE
 
         statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
 
@@ -320,29 +331,10 @@ override fun onResume() {
     // ---------- Orb pulse animation ----------
 
     private fun setupPulseAnimation() {
-        pulseView(findViewById(R.id.pulseRingOuter), 0L)
-        pulseView(findViewById(R.id.pulseRingInner), 800L)
+        // Pulse animation is now handled internally by ParticleSphereView
+        // through its continuous 3D rotation, and dynamic RMS scaling in onRmsChanged.
     }
-
-    private fun pulseView(view: View, delay: Long) {
-        view.alpha = 0f
-        val scaleX = ObjectAnimator.ofFloat(view, View.SCALE_X, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, 1f, 1.7f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        val alpha = ObjectAnimator.ofFloat(view, View.ALPHA, 0.55f, 0f).apply {
-            repeatCount = ObjectAnimator.INFINITE
-        }
-        AnimatorSet().apply {
-            playTogether(scaleX, scaleY, alpha)
-            duration = 1700
-            startDelay = delay
-            interpolator = LinearInterpolator()
-            start()
-        }
-    }// ---------- PIN lock + intruder security ----------
+    // ---------- PIN lock + intruder security ----------
 
     private fun lockUiUntilPinVerified() {
         micButton.isEnabled = false
@@ -487,7 +479,7 @@ override fun onResume() {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
         }
-        stateLabel.text = "Sun raha hoon..."
+        stateLabel.text = "Listening..."
         speechRecognizer.startListening(intent)
     }
 
@@ -497,22 +489,24 @@ override fun onResume() {
             val spokenText = matches?.firstOrNull().orEmpty()
             if (spokenText.isNotBlank()) {
                 youSaidText.text = spokenText
-                stateLabel.text = "Soch raha hoon..."
+                youSaidText.visibility = View.VISIBLE
+                stateLabel.text = "Thinking..."
                 commandExecutor.execute(spokenText)
             } else {
-                stateLabel.text = "Mic dabao aur bolo"
+                stateLabel.text = "Just Say It."
             }
         }
-        override fun onError(error: Int) { stateLabel.text = "Samajh nahi aaya, phir bolo" }
+        override fun onError(error: Int) { stateLabel.text = "Just Say It." }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {
             val scale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.5f
-            findViewById<View>(R.id.micButton).animate()
+            micButton.animate()
                 .scaleX(scale)
                 .scaleY(scale)
                 .setDuration(50)
                 .start()
+            particleOrb.pulseScale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.2f
         }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
@@ -532,7 +526,7 @@ override fun onResume() {
             }
             startService(stopIntent)
             isJarvisRunning = false
-            jarvisToggleButton.text = "  START JARVIS · ALWAYS ON"
+            jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_play, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
             statusLabel.text = "STANDBY"
         } else {
@@ -541,7 +535,7 @@ override fun onResume() {
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
             isJarvisRunning = true
-            jarvisToggleButton.text = "  STOP JARVIS"
+            jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_pause, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
             statusLabel.text = "ALWAYS ON"
         }
@@ -567,7 +561,8 @@ override fun onResume() {
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
         jarvisReplyText.text = cleanText
-        stateLabel.text = "Mic dabao aur bolo"
+        jarvisReplyText.visibility = View.VISIBLE
+        stateLabel.text = "Just Say It."
         SciFiTone.play()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
 
