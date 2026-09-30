@@ -25,8 +25,11 @@ import android.speech.tts.TextToSpeech
 import android.text.InputType
 import android.view.View
 import android.view.animation.LinearInterpolator
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +38,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import android.util.TypedValue
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
@@ -49,6 +53,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var stateLabel: TextView
     private lateinit var youSaidText: TextView
     private lateinit var jarvisReplyText: TextView
+    private lateinit var chatScrollView: ScrollView
+    private lateinit var chatContainer: LinearLayout
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
@@ -91,6 +97,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stateLabel = findViewById(R.id.stateLabel)
         youSaidText = findViewById(R.id.youSaidText)
         jarvisReplyText = findViewById(R.id.jarvisReplyText)
+        chatScrollView = findViewById(R.id.chatScrollView)
+        chatContainer = findViewById(R.id.chatContainer)
         statusDot = findViewById(R.id.statusDot)
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
@@ -299,7 +307,7 @@ override fun onResume() {
             }
             stateLabel.text = "Summarize kar raha hoon..."
             AiCommandParser.summarizeText(text, ApiKeyManager.getGroqApiKey(this)) { summary ->
-                youSaidText.text = "[File summary]"
+                addChatMessage("[File summary]", true)
                 speak(summary)
             }
         } catch (e: Exception) {
@@ -488,8 +496,7 @@ override fun onResume() {
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val spokenText = matches?.firstOrNull().orEmpty()
             if (spokenText.isNotBlank()) {
-                youSaidText.text = spokenText
-                youSaidText.visibility = View.VISIBLE
+                addChatMessage(spokenText, true)
                 stateLabel.text = "Thinking..."
                 commandExecutor.execute(spokenText)
             } else {
@@ -560,14 +567,37 @@ override fun onResume() {
 
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
-        jarvisReplyText.text = cleanText
-        jarvisReplyText.visibility = View.VISIBLE
-        stateLabel.text = "Just Say It."
+        addChatMessage(cleanText, false)
+        stateLabel.text = "Jarvis is speaking"
         SciFiTone.play()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
 
         if (cleanText.contains("API key khaali hai", ignoreCase = true)) {
             checkAndPromptApiKey()
+        }
+    }
+
+    private fun addChatMessage(text: String, isUser: Boolean) {
+        val textView = TextView(this).apply {
+            this.text = text
+            setTextColor(getColorCompat(R.color.text_primary))
+            textSize = 14f
+
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = if (isUser) Gravity.END else Gravity.START
+                bottomMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12f, resources.displayMetrics).toInt()
+            }
+            layoutParams = params
+
+            val bgResId = if (isUser) R.drawable.bg_chat_user else R.drawable.bg_chat_jarvis
+            background = ContextCompat.getDrawable(this@MainActivity, bgResId)
+        }
+        chatContainer.addView(textView)
+        chatScrollView.post {
+            chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
         }
     }
 
