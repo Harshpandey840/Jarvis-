@@ -62,7 +62,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var notesListButton: View
     private lateinit var fileSummaryButton: View
     private lateinit var securityModeButton: View
-    private lateinit var apiKeyButton: View
     private lateinit var jarvisToggleButton: Button
     private lateinit var particleOrb: ParticleSphereView
     private lateinit var micGlow: View
@@ -106,7 +105,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton = findViewById(R.id.notesListButton)
         fileSummaryButton = findViewById(R.id.fileSummaryButton)
         securityModeButton = findViewById(R.id.securityModeButton)
-        apiKeyButton = findViewById(R.id.apiKeyButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
         particleOrb = findViewById(R.id.particleOrb)
         micGlow = findViewById(R.id.micGlow)
@@ -133,11 +131,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         micButton.setOnClickListener { startListening() }
         jarvisToggleButton.setOnClickListener { toggleJarvisService() }
-        voiceSettingsButton.setOnClickListener { showVoicePicker() }
+        voiceSettingsButton.setOnClickListener { showSettingsDialog() }
         notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
-        fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
-        securityModeButton.setOnClickListener { onSecurityModeClicked() }
-        apiKeyButton.setOnClickListener { showApiKeySettingsDialog() }
+        fileSummaryButton.setOnClickListener { requestOverlayPermission() }
+        securityModeButton.setOnClickListener { enrollFace() }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
@@ -360,6 +357,20 @@ override fun onResume() {
         } catch (e: Exception) {
             speak("File nahi padh paya")
         }
+    }
+
+    private fun showSettingsDialog() {
+        val options = arrayOf("Voice Settings", "API Key Settings")
+        AlertDialog.Builder(this)
+            .setTitle("Settings")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showVoicePicker()
+                    1 -> showApiKeySettingsDialog()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ---------- Voice picker ----------
