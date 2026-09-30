@@ -120,7 +120,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
       commandExecutor = CommandExecutor(
     this,
-    { text -> speak(text) }
+    { text -> speak(text) },
+    {},
+    { view ->
+        runOnUiThread {
+            chatContainer.addView(view)
+            chatScrollView.post {
+                chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
+            }
+        }
+    }
 )  
 
         tts = TextToSpeech(this, this)

@@ -39,7 +39,8 @@ import java.util.Locale
 class CommandExecutor(
     private val context: Context,
     private val onSpeak: (String) -> Unit,
-    private val onFinished: () -> Unit = {}
+    private val onFinished: () -> Unit = {},
+    private val onShowView: ((android.view.View) -> Unit)? = null
 ) {
 
     private val appLauncher = AppLauncher(context)
@@ -886,16 +887,8 @@ class CommandExecutor(
 
         Thread {
             try {
-                val host = "indian-railway-irctc.p.rapidapi.com"
-                val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-                val today = dateFormat.format(Date())
-
-                val url = "https://$host/api/trains/v1/train/status" +
-                    "?train_number=$trainNumber" +
-                    "&departure_date=$today" +
-                    "&deviceIdentifier=deviceId" +
-                    "&isH5=1" +
-                    "&client=web"
+                val host = "irctc1.p.rapidapi.com"
+                val url = "https://$host/api/v1/liveTrainStatus?trainNo=$trainNumber&startDay=1"
 
                 Log.d("TrainAPI", "Request URL: $url")
 
@@ -911,65 +904,159 @@ class CommandExecutor(
                     Log.d("TrainAPI", "Response Body: $responseBody")
 
                     if (!response.isSuccessful) {
+                        Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
                         Handler(Looper.getMainLooper()).post { onSpeak("API se response nahi mila") }
                         return@use
                     }
 
-                    val tokener = org.json.JSONTokener(responseBody)
-                    val parsed = tokener.nextValue()
+                    try {
+                        val tokener = org.json.JSONTokener(responseBody)
+                        val parsed = tokener.nextValue()
 
-                    if (parsed is JSONObject) {
-                        var statusMessage = ""
-                        if (parsed.has("body")) {
-                            val body = parsed.optJSONObject("body")
-                            if (body != null) {
-                                statusMessage = body.optString("train_status_message", "")
-                                if (statusMessage.isBlank()) {
-                                    val keys = body.keys()
-                                    while (keys.hasNext()) {
-                                        val k = keys.next()
-                                        val v = body.optString(k, "")
-                                        if (v.isNotBlank()) {
-                                            statusMessage = v
-                                            break
-                                        }
-                                    }
+                        if (parsed is JSONObject) {
+                            val data = parsed.optJSONObject("data") ?: parsed
+
+                            val updateTime = data.optString("updateTime", "")
+                            val currentStationName = data.optString("currentStationName", "Unknown Station")
+                            val delay = data.optInt("delay", 0)
+                            val eta = data.optString("eta", "N/A")
+                            val previousStationName = data.optString("previousStationName", "")
+
+                            // Station timeline parsing logic
+                            val stationsArray = data.optJSONArray("previousStages")
+                            val nextStationsArray = data.optJSONArray("upcomingStages")
+
+                            val stationsTimeline = mutableListOf<String>()
+                            if (stationsArray != null && stationsArray.length() > 0) {
+                                val lastStage = stationsArray.optJSONObject(stationsArray.length() - 1)
+                                if (lastStage != null) {
+                                    stationsTimeline.add(lastStage.optString("stationName", "Unknown"))
                                 }
                             }
-                        } else {
-                            statusMessage = parsed.optString("train_status_message", "")
-                            if (statusMessage.isBlank()) {
-                                val keys = parsed.keys()
-                                while (keys.hasNext()) {
-                                    val k = keys.next()
-                                    val v = parsed.optString(k, "")
-                                    if (v.isNotBlank()) {
-                                        statusMessage = v
-                                        break
-                                    }
+                            stationsTimeline.add(currentStationName)
+                            if (nextStationsArray != null && nextStationsArray.length() > 0) {
+                                val nextStage = nextStationsArray.optJSONObject(0)
+                                if (nextStage != null) {
+                                    stationsTimeline.add(nextStage.optString("stationName", "Unknown"))
                                 }
                             }
-                        }
 
-                        if (statusMessage.isNotBlank()) {
-                            val plainStatus = statusMessage.replace(Regex("<[^>]*>"), "")
-                            val finalSpeech = "Train $trainNumber is currently $plainStatus"
+                            val timelineText = stationsTimeline.joinToString(" → ")
+
+                            // Fallback speech
+                            val statusMessage = "Train $trainNumber is at $currentStationName, delay is $delay minutes."
+
                             Handler(Looper.getMainLooper()).post {
-                                onSpeak(finalSpeech)
+                                onSpeak(statusMessage)
+
+                                // Let's create a visual card if onShowView is available
+                                onShowView?.let { show ->
+                                    val card = createTrainStatusCard(trainNumber, currentStationName, delay, eta, updateTime, timelineText)
+                                    show(card)
+                                }
+
                                 onFinished()
                             }
                         } else {
+                            Log.e("TrainAPI", "JSON Parsing Error: Expected JSONObject but got ${parsed?.javaClass?.simpleName}")
                             Handler(Looper.getMainLooper()).post { onSpeak("Train ka status nahi mil paaya") }
                         }
-                    } else {
+                    } catch (e: org.json.JSONException) {
+                        Log.e("TrainAPI", "JSON Mismatch Error", e)
                         Handler(Looper.getMainLooper()).post { onSpeak("Train ka status nahi mil paaya") }
                     }
                 }
             } catch (e: Exception) {
-                Log.e("TrainAPI", "Network/Parse error in fetchTrainStatus", e)
+                Log.e("TrainAPI", "Network exception in fetchTrainStatus", e)
                 Handler(Looper.getMainLooper()).post { onSpeak("Network error ho gaya") }
             }
         }.start()
+    }
+
+    private fun createTrainStatusCard(trainNumber: String, station: String, delay: Int, eta: String, updateTime: String, timelineText: String): android.view.View {
+        val layout = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val padding = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics).toInt()
+            setPadding(padding, padding, padding, padding)
+
+            val marginParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 12f, resources.displayMetrics).toInt()
+            }
+            layoutParams = marginParams
+
+            // Sleek futuristic dark theme
+            val bg = android.graphics.drawable.GradientDrawable()
+            bg.setColor(android.graphics.Color.parseColor("#15151D"))
+            bg.cornerRadius = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 16f, resources.displayMetrics)
+            bg.setStroke(2, android.graphics.Color.parseColor("#A5A5FF"))
+            background = bg
+        }
+
+        val titleParams = android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_DIP, 8f, layout.resources.displayMetrics).toInt()
+        }
+
+        val titleView = android.widget.TextView(context).apply {
+            text = "LIVE STATUS • $trainNumber"
+            setTextColor(android.graphics.Color.parseColor("#A5A5FF"))
+            textSize = 14f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = titleParams
+        }
+
+        val stationView = android.widget.TextView(context).apply {
+            text = "📍 $station"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            layoutParams = titleParams
+        }
+
+        val delayText = if (delay <= 0) "On Time" else "Late by ${delay}m"
+        val delayColor = if (delay <= 0) "#4CAF50" else "#F44336"
+
+        val delayView = android.widget.TextView(context).apply {
+            text = "Status: $delayText"
+            setTextColor(android.graphics.Color.parseColor(delayColor))
+            textSize = 14f
+            layoutParams = titleParams
+        }
+
+        val etaView = android.widget.TextView(context).apply {
+            text = "ETA: $eta"
+            setTextColor(android.graphics.Color.LTGRAY)
+            textSize = 14f
+            layoutParams = titleParams
+        }
+
+        val timelineView = android.widget.TextView(context).apply {
+            text = "Timeline: $timelineText"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 14f
+            setTypeface(typeface, android.graphics.Typeface.ITALIC)
+            layoutParams = titleParams
+        }
+
+        val updateView = android.widget.TextView(context).apply {
+            text = "Last updated: $updateTime"
+            setTextColor(android.graphics.Color.DKGRAY)
+            textSize = 12f
+        }
+
+        layout.addView(titleView)
+        layout.addView(stationView)
+        layout.addView(delayView)
+        layout.addView(etaView)
+        if (timelineText.isNotBlank()) layout.addView(timelineView)
+        layout.addView(updateView)
+
+        return layout
     }
 
 
