@@ -1,8 +1,12 @@
 <resources>
     <style name="Theme.Jarvis" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#00E5FF</item>
-        <item name="colorPrimaryDark">#000000</item>
-        <item name="colorAccent">#00E5FF</item>
-        <item name="android:windowBackground">#0D0D0D</item>
+        <item name="colorPrimary">@color/accent_primary</item>
+        <item name="colorPrimaryDark">@color/bg_obsidian</item>
+        <item name="colorAccent">@color/accent_primary</item>
+        <item name="android:windowBackground">@color/bg_obsidian</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/bg_obsidian</item>
+        <item name="android:statusBarColor">@color/bg_obsidian</item>
     </style>
 </resources>
