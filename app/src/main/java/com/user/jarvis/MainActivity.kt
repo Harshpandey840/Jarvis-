@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         notesListButton.setOnClickListener { startActivity(Intent(this, ListActivity::class.java)) }
         fileSummaryButton.setOnClickListener { fileSummaryLauncher.launch(arrayOf("text/plain")) }
         securityModeButton.setOnClickListener { onSecurityModeClicked() }
-        apiKeyButton.setOnClickListener { checkAndPromptApiKey(force = true) }
+        apiKeyButton.setOnClickListener { showApiKeySettingsDialog() }
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
@@ -149,10 +149,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             } catch (e: Exception) { }
         }
 
-        checkAndPromptApiKey()
+        checkAndPromptGroqApiKey()
     }
 
-    private fun checkAndPromptApiKey(force: Boolean = false) {
+    private fun showApiKeySettingsDialog() {
+        val options = arrayOf("Groq API Key", "RapidAPI Key")
+        AlertDialog.Builder(this)
+            .setTitle("API Key Settings")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> checkAndPromptGroqApiKey(force = true)
+                    1 -> checkAndPromptRapidApiKey(force = true)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun checkAndPromptGroqApiKey(force: Boolean = false) {
         val currentKey = ApiKeyManager.getGroqApiKey(this)
         if (currentKey.isBlank() || force) {
             val input = EditText(this).apply {
@@ -173,11 +187,44 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         Toast.makeText(this, "API Key saved", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this, "Invalid Key! Must start with gsk_", Toast.LENGTH_SHORT).show()
-                        checkAndPromptApiKey(force) // Prompt again if empty or invalid
+                        checkAndPromptGroqApiKey(force) // Prompt again if empty or invalid
                     }
                 }
                 .apply {
                     if (force && currentKey.isNotBlank()) {
+                        setNegativeButton("Cancel", null)
+                    }
+                }
+                .show()
+        }
+    }
+
+    private fun checkAndPromptRapidApiKey(force: Boolean = false) {
+        val currentKey = ApiKeyManager.getRapidApiKey(this)
+        if (currentKey.isBlank() || force) {
+            val input = EditText(this).apply {
+                hint = "Enter RapidAPI Key"
+                setText(currentKey)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setPadding(50, 50, 50, 50)
+            }
+            AlertDialog.Builder(this)
+                .setTitle(if (currentKey.isBlank()) "RapidAPI Key Required" else "Update RapidAPI Key")
+                .setMessage("Please enter your RapidAPI key for train tracking.")
+                .setView(input)
+                .setCancelable(force)
+                .setPositiveButton("Save") { _, _ ->
+                    val newKey = input.text.toString().trim()
+                    if (newKey.isNotBlank()) {
+                        ApiKeyManager.setRapidApiKey(this, newKey)
+                        Toast.makeText(this, "RapidAPI Key saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Key cannot be empty!", Toast.LENGTH_SHORT).show()
+                        checkAndPromptRapidApiKey(force)
+                    }
+                }
+                .apply {
+                    if (force) {
                         setNegativeButton("Cancel", null)
                     }
                 }
@@ -573,7 +620,9 @@ override fun onResume() {
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
 
         if (cleanText.contains("API key khaali hai", ignoreCase = true)) {
-            checkAndPromptApiKey()
+            checkAndPromptGroqApiKey()
+        } else if (cleanText.contains("RapidAPI key nahi hai", ignoreCase = true)) {
+            checkAndPromptRapidApiKey(force = true)
         }
     }
 
