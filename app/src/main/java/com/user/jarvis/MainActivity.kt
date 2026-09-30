@@ -120,7 +120,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
       commandExecutor = CommandExecutor(
     this,
-    { text -> speak(text) }
+    { text -> speak(text) },
+    { },
+    { view -> addCardMessage(view) }
 )  
 
         tts = TextToSpeech(this, this)
@@ -656,6 +658,20 @@ override fun onResume() {
             background = ContextCompat.getDrawable(this@MainActivity, bgResId)
         }
         chatContainer.addView(textView)
+        chatScrollView.post {
+            chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
+        }
+    }
+
+    private fun addCardMessage(view: android.view.View) {
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12f, resources.displayMetrics).toInt()
+        }
+        view.layoutParams = params
+        chatContainer.addView(view)
         chatScrollView.post {
             chatScrollView.fullScroll(ScrollView.FOCUS_DOWN)
         }

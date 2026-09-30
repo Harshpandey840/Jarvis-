@@ -39,7 +39,8 @@ import java.util.Locale
 class CommandExecutor(
     private val context: Context,
     private val onSpeak: (String) -> Unit,
-    private val onFinished: () -> Unit = {}
+    private val onFinished: () -> Unit = {},
+    private val onShowView: ((android.view.View) -> Unit)? = null
 ) {
 
     private val appLauncher = AppLauncher(context)
@@ -803,6 +804,7 @@ class CommandExecutor(
                     Log.d("TrainAPI", "Response Body: $responseBody")
 
                     if (!response.isSuccessful) {
+                        Log.e("TrainAPI", "Error Code: ${response.code} Body: $responseBody")
                         Handler(Looper.getMainLooper()).post { onSpeak("API se response nahi mila") }
                         return@use
                     }
@@ -859,8 +861,19 @@ class CommandExecutor(
                         }
                         if (trains.isNotEmpty()) {
                             val finalSpeech = "Trains mili hain: " + trains.joinToString(" aur ")
+                            val formattedList = trains.joinToString("\n• ")
+
                             Handler(Looper.getMainLooper()).post {
-                                onSpeak(finalSpeech)
+                                if (onShowView != null) {
+                                    val inflater = android.view.LayoutInflater.from(context)
+                                    val view = inflater.inflate(R.layout.layout_train_card, null, false)
+                                    view.findViewById<android.widget.TextView>(R.id.cardTitle).text = "Trains: $fromStationCode → $toStationCode"
+                                    view.findViewById<android.widget.TextView>(R.id.cardBody).text = "• $formattedList"
+                                    onShowView.invoke(view)
+                                    onSpeak("Ye rahi trains ki details")
+                                } else {
+                                    onSpeak(finalSpeech)
+                                }
                                 onFinished()
                             }
                         } else {
@@ -911,6 +924,7 @@ class CommandExecutor(
                     Log.d("TrainAPI", "Response Body: $responseBody")
 
                     if (!response.isSuccessful) {
+                        Log.e("TrainAPI", "Error Code: ${response.code} Body: $responseBody")
                         Handler(Looper.getMainLooper()).post { onSpeak("API se response nahi mila") }
                         return@use
                     }
@@ -955,7 +969,16 @@ class CommandExecutor(
                             val plainStatus = statusMessage.replace(Regex("<[^>]*>"), "")
                             val finalSpeech = "Train $trainNumber is currently $plainStatus"
                             Handler(Looper.getMainLooper()).post {
-                                onSpeak(finalSpeech)
+                                if (onShowView != null) {
+                                    val inflater = android.view.LayoutInflater.from(context)
+                                    val view = inflater.inflate(R.layout.layout_train_card, null, false)
+                                    view.findViewById<android.widget.TextView>(R.id.cardTitle).text = "Train $trainNumber Status"
+                                    view.findViewById<android.widget.TextView>(R.id.cardBody).text = plainStatus
+                                    onShowView.invoke(view)
+                                    onSpeak("Ye raha train status")
+                                } else {
+                                    onSpeak(finalSpeech)
+                                }
                                 onFinished()
                             }
                         } else {
