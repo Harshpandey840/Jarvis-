@@ -5,6 +5,7 @@ import android.content.Context
 object ApiKeyManager {
     private const val PREFS_NAME = "jarvis_keys"
     private const val KEY_GROQ = "GROQ_API_KEY"
+    private const val KEY_RAPID = "RAPIDAPI_KEY"
 
     fun getGroqApiKey(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -14,5 +15,15 @@ object ApiKeyManager {
     fun setGroqApiKey(context: Context, apiKey: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_GROQ, apiKey).apply()
+    }
+
+    fun getRapidApiKey(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_RAPID, "") ?: ""
+    }
+
+    fun setRapidApiKey(context: Context, apiKey: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_RAPID, apiKey).apply()
     }
 }

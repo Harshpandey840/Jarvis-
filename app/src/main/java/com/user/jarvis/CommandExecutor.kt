@@ -771,8 +771,7 @@ class CommandExecutor(
     }
 
     private fun fetchTrainStatus(trainNumber: String, onFinished: () -> Unit) {
-        val keysPrefs = context.getSharedPreferences("jarvis_keys", Context.MODE_PRIVATE)
-        val apiKey = keysPrefs.getString("RAPIDAPI_KEY", "") ?: ""
+        val apiKey = ApiKeyManager.getRapidApiKey(context)
         if (apiKey.isBlank()) {
             onSpeak("RapidAPI key nahi hai")
             return
