@@ -839,7 +839,7 @@ class CommandExecutor(
             try {
                 val prompt = "The user is currently in Arma, Lakhisarai, Bihar, India. Provide a very brief, realistic current weather estimation and local intel for this location."
                 val requestJson = org.json.JSONObject().apply {
-                    put("model", "llama-3.1-8b-instant")
+                    put("model", "openai/gpt-oss-20b")
                     put("temperature", 0.7)
                     put("messages", org.json.JSONArray()
                         .put(org.json.JSONObject().apply {
