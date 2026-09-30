@@ -764,10 +764,76 @@ class CommandExecutor(
                 fetchTrainStatus(command.trainNumber, onFinished)
             }
 
+            is Command.TrainsBetweenStations -> {
+                fetchTrainsBetweenStations(command.fromStationCode, command.toStationCode, onFinished)
+            }
+
             is Command.Unknown -> {
                 onSpeak("Samajh nahi aaya")
             }
         }
+    }
+
+    private fun fetchTrainsBetweenStations(fromStationCode: String, toStationCode: String, onFinished: () -> Unit) {
+        val apiKey = ApiKeyManager.getRapidApiKey(context)
+        if (apiKey.isBlank()) {
+            onSpeak("RapidAPI key nahi hai")
+            return
+        }
+
+        Thread {
+            try {
+                val host = "irctc1.p.rapidapi.com"
+
+                val url = "https://$host/api/v1/trainBetweenStations" +
+                    "?fromStationCode=$fromStationCode" +
+                    "&toStationCode=$toStationCode"
+
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-rapidapi-host", host)
+                    .addHeader("x-rapidapi-key", apiKey)
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        Handler(Looper.getMainLooper()).post { onSpeak("API se response nahi mila") }
+                        return@use
+                    }
+                    val json = JSONObject(response.body?.string().orEmpty())
+                    if (json.has("data")) {
+                        val dataArray = json.optJSONArray("data")
+                        if (dataArray != null && dataArray.length() > 0) {
+                            val count = minOf(dataArray.length(), 2)
+                            val trains = mutableListOf<String>()
+                            for (i in 0 until count) {
+                                val trainObj = dataArray.getJSONObject(i)
+                                val tName = trainObj.optString("train_name", "")
+                                val tNum = trainObj.optString("train_number", "")
+                                if (tName.isNotBlank() && tNum.isNotBlank()) {
+                                    trains.add("$tNum $tName")
+                                }
+                            }
+                            if (trains.isNotEmpty()) {
+                                val finalSpeech = "Trains mili hain: " + trains.joinToString(" aur ")
+                                Handler(Looper.getMainLooper()).post {
+                                    onSpeak(finalSpeech)
+                                    onFinished()
+                                }
+                            } else {
+                                Handler(Looper.getMainLooper()).post { onSpeak("Koi train nahi mili") }
+                            }
+                        } else {
+                            Handler(Looper.getMainLooper()).post { onSpeak("Koi train nahi mili") }
+                        }
+                    } else {
+                        Handler(Looper.getMainLooper()).post { onSpeak("Koi train nahi mili") }
+                    }
+                }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post { onSpeak("Network error ho gaya") }
+            }
+        }.start()
     }
 
     private fun fetchTrainStatus(trainNumber: String, onFinished: () -> Unit) {
