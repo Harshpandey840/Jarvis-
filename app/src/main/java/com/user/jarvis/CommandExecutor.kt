@@ -789,7 +789,7 @@ class CommandExecutor(
             try {
                 val host = "indian-railway-irctc.p.rapidapi.com"
 
-                val url = "https://$host/api/v1/trainBetweenStations" +
+                val url = "https://$host/getTrainBetweenStation" +
                     "?fromStationCode=$fromStationCode" +
                     "&toStationCode=$toStationCode" +
                     "&client=web&isH5=true&deviceIdentifier=123"
@@ -931,65 +931,81 @@ class CommandExecutor(
                         if (parsed is JSONObject) {
                             val data = parsed.optJSONObject("data") ?: parsed
 
-                            val updateTime = data.optString("updateTime", "")
+                            val updateTime = data.optString("last_updated", data.optString("updateTime", ""))
 
-                            var currentStationName = data.optString("currentStationName", "")
+                            var currentStationName = data.optString("current_station", "")
+                            if (currentStationName.isBlank()) currentStationName = data.optString("currentStationName", "")
                             if (currentStationName.isBlank()) currentStationName = data.optString("current_station_name", "")
                             if (currentStationName.isBlank()) currentStationName = data.optString("stationName", "")
                             if (currentStationName.isBlank()) currentStationName = data.optString("station_name", "Unknown Station")
                             if (currentStationName.isBlank()) currentStationName = "Unknown Station"
 
-                            var delay = 0
-                            if (data.has("delay")) {
-                                delay = data.optInt("delay", 0)
-                            } else if (data.has("delayInMins")) {
-                                delay = data.optInt("delayInMins", 0)
-                            } else if (data.has("delay_in_mins")) {
-                                delay = data.optInt("delay_in_mins", 0)
-                            }
-
+                            val delay = data.optInt("delay_minutes", data.optInt("delay", 0))
                             var eta = data.optString("eta", "")
                             if (eta.isBlank()) eta = "N/A"
 
-                            val previousStationName = data.optString("previousStationName", "")
-
                             // Station timeline parsing logic
-                            var stationsArray = data.optJSONArray("previousStages")
-                            if (stationsArray == null) stationsArray = data.optJSONArray("previous_stages")
-
-                            var nextStationsArray = data.optJSONArray("upcomingStages")
-                            if (nextStationsArray == null) nextStationsArray = data.optJSONArray("upcoming_stages")
-
                             val stationsTimeline = mutableListOf<String>()
-                            if (stationsArray != null && stationsArray.length() > 0) {
-                                val lastStage = stationsArray.optJSONObject(stationsArray.length() - 1)
-                                if (lastStage != null) {
-                                    var stageName = lastStage.optString("stationName", "")
-                                    if (stageName.isBlank()) stageName = lastStage.optString("station_name", "Unknown")
+                            val timelineArray = data.optJSONArray("timeline")
+                            if (timelineArray != null && timelineArray.length() > 0) {
+                                for (i in 0 until timelineArray.length()) {
+                                    val stage = timelineArray.optJSONObject(i) ?: continue
+                                    val stageName = stage.optString("station_name", "Unknown")
                                     stationsTimeline.add(stageName)
                                 }
-                            }
-                            stationsTimeline.add(currentStationName)
-                            if (nextStationsArray != null && nextStationsArray.length() > 0) {
-                                val nextStage = nextStationsArray.optJSONObject(0)
-                                if (nextStage != null) {
-                                    var stageName = nextStage.optString("stationName", "")
-                                    if (stageName.isBlank()) stageName = nextStage.optString("station_name", "Unknown")
-                                    stationsTimeline.add(stageName)
+                            } else {
+                                // Fallbacks for other structures
+                                var stationsArray = data.optJSONArray("previousStages")
+                                if (stationsArray == null) stationsArray = data.optJSONArray("previous_stages")
+                                var nextStationsArray = data.optJSONArray("upcomingStages")
+                                if (nextStationsArray == null) nextStationsArray = data.optJSONArray("upcoming_stages")
+
+                                if (stationsArray != null && stationsArray.length() > 0) {
+                                    val lastStage = stationsArray.optJSONObject(stationsArray.length() - 1)
+                                    if (lastStage != null) {
+                                        var stageName = lastStage.optString("stationName", "")
+                                        if (stageName.isBlank()) stageName = lastStage.optString("station_name", "Unknown")
+                                        stationsTimeline.add(stageName)
+                                    }
+                                }
+                                stationsTimeline.add(currentStationName)
+                                if (nextStationsArray != null && nextStationsArray.length() > 0) {
+                                    val nextStage = nextStationsArray.optJSONObject(0)
+                                    if (nextStage != null) {
+                                        var stageName = nextStage.optString("stationName", "")
+                                        if (stageName.isBlank()) stageName = nextStage.optString("station_name", "Unknown")
+                                        stationsTimeline.add(stageName)
+                                    }
                                 }
                             }
 
                             val timelineText = stationsTimeline.joinToString(" → ")
 
+                            data class LiveTrainStatus(
+                                val currentStationName: String,
+                                val delay: Int,
+                                val eta: String,
+                                val updateTime: String,
+                                val timelineText: String
+                            )
+
+                            val status = LiveTrainStatus(
+                                currentStationName = currentStationName,
+                                delay = delay,
+                                eta = eta,
+                                updateTime = updateTime,
+                                timelineText = timelineText
+                            )
+
                             // Fallback speech
-                            val statusMessage = "Train $trainNumber is at $currentStationName, delay is $delay minutes."
+                            val statusMessage = "Train $trainNumber is at ${status.currentStationName}, delay is ${status.delay} minutes."
 
                             Handler(Looper.getMainLooper()).post {
                                 onSpeak(statusMessage)
 
                                 // Let's create a visual card if onShowView is available
                                 onShowView?.let { show ->
-                                    val card = createTrainStatusCard(trainNumber, currentStationName, delay, eta, updateTime, timelineText)
+                                    val card = createTrainStatusCard(trainNumber, status.currentStationName, status.delay, status.eta, status.updateTime, status.timelineText)
                                     show(card)
                                 }
 
