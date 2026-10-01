@@ -29,6 +29,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -52,7 +53,9 @@ class CommandExecutor(
     private val prefs: SharedPreferences =
         context.getSharedPreferences("jarvis_notes", Context.MODE_PRIVATE)
 
-    private val httpClient = OkHttpClient()
+    private val httpClient = OkHttpClient.Builder()
+        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+        .build()
 
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
@@ -786,7 +789,7 @@ class CommandExecutor(
             try {
                 val host = "indian-railway-irctc.p.rapidapi.com"
 
-                val url = "https://$host/getTrainBetweenStation" +
+                val url = "https://$host/api/v1/trainBetweenStations" +
                     "?fromStationCode=$fromStationCode" +
                     "&toStationCode=$toStationCode" +
                     "&client=web&isH5=true&deviceIdentifier=123"
@@ -799,6 +802,7 @@ class CommandExecutor(
                     .addHeader("X-RapidAPI-Key", apiKey)
                     .build()
 
+                Log.d("TrainAPI", "Final Request URL: ${request.url}")
                 httpClient.newCall(request).execute().use { response ->
                     Log.d("TrainAPI", "Response Code: ${response.code}")
                     val responseBody = response.body?.string().orEmpty()
@@ -907,6 +911,7 @@ class CommandExecutor(
                     .addHeader("x-rapid-api", "rapid-api-database")
                     .build()
 
+                Log.d("TrainAPI", "Final Request URL: ${request.url}")
                 httpClient.newCall(request).execute().use { response ->
                     Log.d("TrainAPI", "Response Code: ${response.code}")
                     val responseBody = response.body?.string().orEmpty()
