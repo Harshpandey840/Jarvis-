@@ -932,9 +932,21 @@ class CommandExecutor(
                             val data = parsed.optJSONObject("data") ?: parsed
 
                             val updateTime = data.optString("updateTime", "")
-                            val currentStationName = data.optString("currentStationName", "Unknown Station")
-                            val delay = data.optInt("delay", 0)
-                            val eta = data.optString("eta", "N/A")
+
+                            var currentStationName = data.optString("currentStationName", "")
+                            if (currentStationName.isBlank()) currentStationName = data.optString("stationName", "Unknown Station")
+                            if (currentStationName.isBlank()) currentStationName = "Unknown Station"
+
+                            var delay = 0
+                            if (data.has("delay")) {
+                                delay = data.optInt("delay", 0)
+                            } else if (data.has("delayInMins")) {
+                                delay = data.optInt("delayInMins", 0)
+                            }
+
+                            var eta = data.optString("eta", "")
+                            if (eta.isBlank()) eta = "N/A"
+
                             val previousStationName = data.optString("previousStationName", "")
 
                             // Station timeline parsing logic
