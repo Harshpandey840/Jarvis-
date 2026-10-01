@@ -896,14 +896,15 @@ class CommandExecutor(
         Thread {
             try {
                 val host = "indian-railway-irctc.p.rapidapi.com"
-                val url = "https://$host/getLiveTrainStatus?trainNo=$trainNumber&startDay=1&client=web&isH5=true&deviceIdentifier=123"
+                val url = "https://$host/api/trains-search/v1/train/$trainNumber?client=web&isH5=true"
 
                 Log.d("TrainAPI", "Request URL: $url")
 
                 val request = Request.Builder()
                     .url(url)
-                    .addHeader("X-RapidAPI-Host", host)
-                    .addHeader("X-RapidAPI-Key", apiKey)
+                    .addHeader("x-rapidapi-host", host)
+                    .addHeader("x-rapidapi-key", apiKey)
+                    .addHeader("x-rapid-api", "rapid-api-database")
                     .build()
 
                 httpClient.newCall(request).execute().use { response ->
