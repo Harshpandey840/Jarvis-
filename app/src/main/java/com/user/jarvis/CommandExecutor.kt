@@ -934,7 +934,9 @@ class CommandExecutor(
                             val updateTime = data.optString("updateTime", "")
 
                             var currentStationName = data.optString("currentStationName", "")
-                            if (currentStationName.isBlank()) currentStationName = data.optString("stationName", "Unknown Station")
+                            if (currentStationName.isBlank()) currentStationName = data.optString("current_station_name", "")
+                            if (currentStationName.isBlank()) currentStationName = data.optString("stationName", "")
+                            if (currentStationName.isBlank()) currentStationName = data.optString("station_name", "Unknown Station")
                             if (currentStationName.isBlank()) currentStationName = "Unknown Station"
 
                             var delay = 0
@@ -942,6 +944,8 @@ class CommandExecutor(
                                 delay = data.optInt("delay", 0)
                             } else if (data.has("delayInMins")) {
                                 delay = data.optInt("delayInMins", 0)
+                            } else if (data.has("delay_in_mins")) {
+                                delay = data.optInt("delay_in_mins", 0)
                             }
 
                             var eta = data.optString("eta", "")
@@ -950,21 +954,28 @@ class CommandExecutor(
                             val previousStationName = data.optString("previousStationName", "")
 
                             // Station timeline parsing logic
-                            val stationsArray = data.optJSONArray("previousStages")
-                            val nextStationsArray = data.optJSONArray("upcomingStages")
+                            var stationsArray = data.optJSONArray("previousStages")
+                            if (stationsArray == null) stationsArray = data.optJSONArray("previous_stages")
+
+                            var nextStationsArray = data.optJSONArray("upcomingStages")
+                            if (nextStationsArray == null) nextStationsArray = data.optJSONArray("upcoming_stages")
 
                             val stationsTimeline = mutableListOf<String>()
                             if (stationsArray != null && stationsArray.length() > 0) {
                                 val lastStage = stationsArray.optJSONObject(stationsArray.length() - 1)
                                 if (lastStage != null) {
-                                    stationsTimeline.add(lastStage.optString("stationName", "Unknown"))
+                                    var stageName = lastStage.optString("stationName", "")
+                                    if (stageName.isBlank()) stageName = lastStage.optString("station_name", "Unknown")
+                                    stationsTimeline.add(stageName)
                                 }
                             }
                             stationsTimeline.add(currentStationName)
                             if (nextStationsArray != null && nextStationsArray.length() > 0) {
                                 val nextStage = nextStationsArray.optJSONObject(0)
                                 if (nextStage != null) {
-                                    stationsTimeline.add(nextStage.optString("stationName", "Unknown"))
+                                    var stageName = nextStage.optString("stationName", "")
+                                    if (stageName.isBlank()) stageName = nextStage.optString("station_name", "Unknown")
+                                    stationsTimeline.add(stageName)
                                 }
                             }
 
