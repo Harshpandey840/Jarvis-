@@ -790,12 +790,17 @@ class CommandExecutor(
                 val host = "indian-railway-irctc.p.rapidapi.com"
 
                 val pathsToTest = listOf(
-                    "/api/trains-search/v1/between-stations",
-                    "/api/trains-search/v1/search",
-                    "/api/trains-search/v1/train-between-stations"
+                    "/api/trains/v1/betweenStations",
+                    "/api/trains/v1/trainBetweenStations",
+                    "/api/trains/v1/search",
+                    "/api/trains/v1/between-stations"
                 )
 
                 var success = false
+                var lastHttpCode = -1
+                var networkErrorOccurred = false
+                var emptyResponseOccurred = false
+                var invalidStationOccurred = false
 
                 for (path in pathsToTest) {
                     val url = "https://$host$path" +
@@ -823,7 +828,8 @@ class CommandExecutor(
 
                             if (!response.isSuccessful) {
                                 Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
-                                return@use
+                                lastHttpCode = response.code
+                                return@use // continue to next endpoint
                             }
 
                             try {
@@ -835,6 +841,16 @@ class CommandExecutor(
                                 if (parsed is org.json.JSONArray) {
                                     dataArray = parsed
                                 } else if (parsed is JSONObject) {
+                                    // Check for basic error message or invalid status
+                                    val message = parsed.optString("message", "").lowercase()
+                                    if (message.contains("invalid") || message.contains("error")) {
+                                        invalidStationOccurred = true
+                                    }
+                                    val status = parsed.optBoolean("status", true)
+                                    if (!status) {
+                                         invalidStationOccurred = true
+                                    }
+
                                     dataArray = parsed.optJSONArray("data")
                                     if (dataArray == null) {
                                         val keys = parsed.keys()
@@ -849,43 +865,47 @@ class CommandExecutor(
                                     }
                                 }
 
-                                if (dataArray != null && dataArray.length() > 0) {
-                                    val count = minOf(dataArray.length(), 2)
-                                    val trains = mutableListOf<String>()
-                                    for (i in 0 until count) {
-                                        val trainObj = dataArray.optJSONObject(i) ?: continue
-                                        var tName = trainObj.optString("train_name", "")
-                                        var tNum = trainObj.optString("train_number", "")
+                                if (dataArray != null) {
+                                     if (dataArray.length() == 0) {
+                                        emptyResponseOccurred = true
+                                     } else {
+                                        val count = minOf(dataArray.length(), 2)
+                                        val trains = mutableListOf<String>()
+                                        for (i in 0 until count) {
+                                            val trainObj = dataArray.optJSONObject(i) ?: continue
+                                            var tName = trainObj.optString("train_name", trainObj.optString("trainName", ""))
+                                            var tNum = trainObj.optString("train_number", trainObj.optString("trainNumber", ""))
 
-                                        if (tName.isBlank() || tNum.isBlank()) {
-                                            val keys = trainObj.keys()
-                                            val strValues = mutableListOf<String>()
-                                            while (keys.hasNext()) {
-                                                val k = keys.next()
-                                                val v = trainObj.optString(k, "")
-                                                if (v.isNotBlank()) strValues.add(v)
+                                            if (tName.isBlank() || tNum.isBlank()) {
+                                                val keys = trainObj.keys()
+                                                val strValues = mutableListOf<String>()
+                                                while (keys.hasNext()) {
+                                                    val k = keys.next()
+                                                    val v = trainObj.optString(k, "")
+                                                    if (v.isNotBlank()) strValues.add(v)
+                                                }
+                                                if (tNum.isBlank() && strValues.isNotEmpty()) {
+                                                    tNum = strValues.removeAt(0)
+                                                }
+                                                if (tName.isBlank() && strValues.isNotEmpty()) {
+                                                    tName = strValues.removeAt(0)
+                                                }
                                             }
-                                            if (tNum.isBlank() && strValues.isNotEmpty()) {
-                                                tNum = strValues.removeAt(0)
-                                            }
-                                            if (tName.isBlank() && strValues.isNotEmpty()) {
-                                                tName = strValues.removeAt(0)
-                                            }
-                                        }
 
-                                        if (tName.isNotBlank() && tNum.isNotBlank()) {
-                                            trains.add("$tNum $tName")
+                                            if (tName.isNotBlank() && tNum.isNotBlank()) {
+                                                trains.add("$tNum $tName")
+                                            }
                                         }
-                                    }
-                                    if (trains.isNotEmpty()) {
-                                        val finalSpeech = "Trains mili hain: " + trains.joinToString(" aur ")
-                                        Handler(Looper.getMainLooper()).post {
-                                            onSpeak(finalSpeech)
-                                            onFinished()
+                                        if (trains.isNotEmpty()) {
+                                            val finalSpeech = "Trains mili hain: " + trains.joinToString(" aur ")
+                                            Handler(Looper.getMainLooper()).post {
+                                                onSpeak(finalSpeech)
+                                                onFinished()
+                                            }
+                                            success = true
+                                            return@use
                                         }
-                                        success = true
-                                        return@use
-                                    }
+                                     }
                                 }
                             } catch (e: Exception) {
                                 Log.e("TrainAPI", "JSON Parse error on path $path", e)
@@ -893,13 +913,22 @@ class CommandExecutor(
                         }
                     } catch (e: Exception) {
                         Log.e("TrainAPI", "Network exception on path $path", e)
+                        networkErrorOccurred = true
                     }
 
                     if (success) break
                 }
 
                 if (!success) {
-                    Handler(Looper.getMainLooper()).post { onSpeak("Koi train nahi mili ya API fail ho gayi") }
+                    Handler(Looper.getMainLooper()).post {
+                        when {
+                            invalidStationOccurred -> onSpeak("Station code galat lag raha hai ya API pe data nahi hai")
+                            emptyResponseOccurred -> onSpeak("In stations ke beech koi train nahi mili")
+                            lastHttpCode != -1 -> onSpeak("API fail ho gayi, error code $lastHttpCode")
+                            networkErrorOccurred -> onSpeak("Network error aa raha hai")
+                            else -> onSpeak("Koi train nahi mili ya API fail ho gayi")
+                        }
+                    }
                 }
 
             } catch (e: Exception) {
