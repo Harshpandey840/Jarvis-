@@ -784,11 +784,12 @@ class CommandExecutor(
 
         Thread {
             try {
-                val host = "irctc1.p.rapidapi.com"
+                val host = "indian-railway-irctc.p.rapidapi.com"
 
                 val url = "https://$host/api/v1/trainBetweenStations" +
                     "?fromStationCode=$fromStationCode" +
-                    "&toStationCode=$toStationCode"
+                    "&toStationCode=$toStationCode" +
+                    "&client=web&isH5=true&deviceIdentifier=123"
 
                 Log.d("TrainAPI", "Request URL: $url")
 
@@ -894,8 +895,8 @@ class CommandExecutor(
 
         Thread {
             try {
-                val host = "irctc1.p.rapidapi.com"
-                val url = "https://$host/api/v1/liveTrainStatus?trainNo=$trainNumber&startDay=1"
+                val host = "indian-railway-irctc.p.rapidapi.com"
+                val url = "https://$host/api/v1/liveTrainStatus?trainNo=$trainNumber&startDay=1&client=web&isH5=true&deviceIdentifier=123"
 
                 Log.d("TrainAPI", "Request URL: $url")
 
