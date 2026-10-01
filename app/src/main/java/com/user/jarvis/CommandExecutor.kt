@@ -919,7 +919,9 @@ class CommandExecutor(
         Thread {
             try {
                 val host = "indian-railway-irctc.p.rapidapi.com"
-                val url = "https://$host/api/trains-search/v1/train/$trainNumber?client=web&isH5=true"
+                val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+                val currentDate = dateFormat.format(Date())
+                val url = "https://$host/api/trains/v1/train/status?train_number=$trainNumber&departure_date=$currentDate&deviceIdentifier=Mozilla%20Firefox-138.0.0.0&isH5=true&client=web"
 
                 Log.d("TrainAPI", "Request URL: $url")
 
