@@ -34,7 +34,7 @@ sealed class Command {
     object GamingMode : Command()
     object CheckServerStatus : Command()
     data class TrainStatus(val trainNumber: String) : Command()
-    data class TrainsBetweenStations(val fromStationCode: String, val toStationCode: String) : Command()
+    data class TrainInfo(val query: String) : Command()
 
     // Phase 3 Extensions
     object JarvisVision : Command()

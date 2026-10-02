@@ -768,8 +768,8 @@ class CommandExecutor(
                 fetchTrainStatus(command.trainNumber, onFinished)
             }
 
-            is Command.TrainsBetweenStations -> {
-                fetchTrainsBetweenStations(command.fromStationCode, command.toStationCode, onFinished)
+            is Command.TrainInfo -> {
+                fetchTrainInfo(command.query, onFinished)
             }
 
             is Command.Unknown -> {
@@ -778,7 +778,7 @@ class CommandExecutor(
         }
     }
 
-    private fun fetchTrainsBetweenStations(fromStationCode: String, toStationCode: String, onFinished: () -> Unit) {
+    private fun fetchTrainInfo(query: String, onFinished: () -> Unit) {
         val apiKey = ApiKeyManager.getRapidApiKey(context)
         if (apiKey.isBlank()) {
             onSpeak("RapidAPI key nahi hai")
@@ -788,152 +788,98 @@ class CommandExecutor(
         Thread {
             try {
                 val host = "indian-railway-irctc.p.rapidapi.com"
+                val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+                val url = "https://$host/api/trains-search/v1/train/$encodedQuery?client=web&isH5=true"
 
-                val pathsToTest = listOf(
-                    "/api/trains/v1/betweenStations",
-                    "/api/trains/v1/trainBetweenStations",
-                    "/api/trains/v1/search",
-                    "/api/trains/v1/between-stations"
-                )
+                Log.d("TrainAPI", "Request URL: $url")
 
-                var success = false
-                var lastHttpCode = -1
-                var networkErrorOccurred = false
-                var emptyResponseOccurred = false
-                var invalidStationOccurred = false
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("x-rapidapi-host", host)
+                    .addHeader("x-rapidapi-key", apiKey)
+                    .addHeader("x-rapid-api", "rapid-api-database")
+                    .build()
 
-                for (path in pathsToTest) {
-                    val url = "https://$host$path" +
-                        "?fromStationCode=$fromStationCode" +
-                        "&toStationCode=$toStationCode" +
-                        "&client=web&isH5=true"
+                Log.d("TrainAPI", "Final Request URL: ${request.url}")
+                httpClient.newCall(request).execute().use { response ->
+                    Log.d("TrainAPI", "Response Code: ${response.code}")
+                    val responseBody = response.body?.string().orEmpty()
+                    Log.d("TrainDebug", "Raw JSON Response: $responseBody")
+                    Log.d("TrainAPI", "Response Body: $responseBody")
 
-                    Log.d("TrainAPI", "Request URL: $url")
-
-                    val request = Request.Builder()
-                        .url(url)
-                        .addHeader("x-rapidapi-host", host)
-                        .addHeader("x-rapidapi-key", apiKey)
-                        .addHeader("x-rapid-api", "rapid-api-database")
-                        .build()
-
-                    Log.d("TrainAPI", "Final Request URL: ${request.url}")
+                    if (!response.isSuccessful) {
+                        Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
+                        Handler(Looper.getMainLooper()).post { onSpeak("HTTP Error ${response.code}") }
+                        return@use
+                    }
 
                     try {
-                        httpClient.newCall(request).execute().use { response ->
-                            Log.d("TrainAPI", "Response Code: ${response.code}")
-                            val responseBody = response.body?.string().orEmpty()
-                            Log.d("TrainDebug", "Raw JSON Response: $responseBody")
-                            Log.d("TrainAPI", "Response Body: $responseBody")
+                        val tokener = org.json.JSONTokener(responseBody)
+                        val parsed = tokener.nextValue()
+                        var dataArray: org.json.JSONArray? = null
 
-                            if (!response.isSuccessful) {
-                                Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
-                                lastHttpCode = response.code
-                                return@use // continue to next endpoint
+                        if (parsed is JSONObject) {
+                            if (!parsed.optBoolean("status", true)) {
+                                Handler(Looper.getMainLooper()).post { onSpeak("Train ka data nahi mila") }
+                                return@use
                             }
-
-                            try {
-                                val tokener = org.json.JSONTokener(responseBody)
-                                val parsed = tokener.nextValue()
-
-                                var dataArray: org.json.JSONArray? = null
-
-                                if (parsed is org.json.JSONArray) {
-                                    dataArray = parsed
-                                } else if (parsed is JSONObject) {
-                                    // Check for basic error message or invalid status
-                                    val message = parsed.optString("message", "").lowercase()
-                                    if (message.contains("invalid") || message.contains("error")) {
-                                        invalidStationOccurred = true
-                                    }
-                                    val status = parsed.optBoolean("status", true)
-                                    if (!status) {
-                                         invalidStationOccurred = true
-                                    }
-
-                                    dataArray = parsed.optJSONArray("data")
-                                    if (dataArray == null) {
-                                        val keys = parsed.keys()
-                                        while (keys.hasNext()) {
-                                            val key = keys.next()
-                                            val optArr = parsed.optJSONArray(key)
-                                            if (optArr != null) {
-                                                dataArray = optArr
-                                                break
-                                            }
-                                        }
+                            dataArray = parsed.optJSONArray("data")
+                            if (dataArray == null) {
+                                val keys = parsed.keys()
+                                while (keys.hasNext()) {
+                                    val key = keys.next()
+                                    val optArr = parsed.optJSONArray(key)
+                                    if (optArr != null) {
+                                        dataArray = optArr
+                                        break
                                     }
                                 }
-
-                                if (dataArray != null) {
-                                     if (dataArray.length() == 0) {
-                                        emptyResponseOccurred = true
-                                     } else {
-                                        val count = minOf(dataArray.length(), 2)
-                                        val trains = mutableListOf<String>()
-                                        for (i in 0 until count) {
-                                            val trainObj = dataArray.optJSONObject(i) ?: continue
-                                            var tName = trainObj.optString("train_name", trainObj.optString("trainName", ""))
-                                            var tNum = trainObj.optString("train_number", trainObj.optString("trainNumber", ""))
-
-                                            if (tName.isBlank() || tNum.isBlank()) {
-                                                val keys = trainObj.keys()
-                                                val strValues = mutableListOf<String>()
-                                                while (keys.hasNext()) {
-                                                    val k = keys.next()
-                                                    val v = trainObj.optString(k, "")
-                                                    if (v.isNotBlank()) strValues.add(v)
-                                                }
-                                                if (tNum.isBlank() && strValues.isNotEmpty()) {
-                                                    tNum = strValues.removeAt(0)
-                                                }
-                                                if (tName.isBlank() && strValues.isNotEmpty()) {
-                                                    tName = strValues.removeAt(0)
-                                                }
-                                            }
-
-                                            if (tName.isNotBlank() && tNum.isNotBlank()) {
-                                                trains.add("$tNum $tName")
-                                            }
-                                        }
-                                        if (trains.isNotEmpty()) {
-                                            val finalSpeech = "Trains mili hain: " + trains.joinToString(" aur ")
-                                            Handler(Looper.getMainLooper()).post {
-                                                onSpeak(finalSpeech)
-                                                onFinished()
-                                            }
-                                            success = true
-                                            return@use
-                                        }
-                                     }
-                                }
-                            } catch (e: Exception) {
-                                Log.e("TrainAPI", "JSON Parse error on path $path", e)
                             }
+                        } else if (parsed is org.json.JSONArray) {
+                            dataArray = parsed
                         }
+
+                        if (dataArray != null && dataArray.length() > 0) {
+                            val trainObj = dataArray.optJSONObject(0)
+                            if (trainObj != null) {
+                                var tName = trainObj.optString("train_name", trainObj.optString("trainName", ""))
+                                var tNum = trainObj.optString("train_number", trainObj.optString("trainNumber", ""))
+
+                                if (tName.isBlank() || tNum.isBlank()) {
+                                    val keys = trainObj.keys()
+                                    val strValues = mutableListOf<String>()
+                                    while (keys.hasNext()) {
+                                        val k = keys.next()
+                                        val v = trainObj.optString(k, "")
+                                        if (v.isNotBlank()) strValues.add(v)
+                                    }
+                                    if (tNum.isBlank() && strValues.isNotEmpty()) tNum = strValues.removeAt(0)
+                                    if (tName.isBlank() && strValues.isNotEmpty()) tName = strValues.removeAt(0)
+                                }
+
+                                if (tName.isNotBlank() && tNum.isNotBlank()) {
+                                    Handler(Looper.getMainLooper()).post {
+                                        onSpeak("Train hai: $tNum $tName")
+                                        onFinished()
+                                    }
+                                } else {
+                                    Handler(Looper.getMainLooper()).post { onSpeak("Train detail theek se nahi mili") }
+                                }
+                            } else {
+                                Handler(Looper.getMainLooper()).post { onSpeak("Train object nahi mila") }
+                            }
+                        } else {
+                            Handler(Looper.getMainLooper()).post { onSpeak("Train nahi mili") }
+                        }
+
                     } catch (e: Exception) {
-                        Log.e("TrainAPI", "Network exception on path $path", e)
-                        networkErrorOccurred = true
-                    }
-
-                    if (success) break
-                }
-
-                if (!success) {
-                    Handler(Looper.getMainLooper()).post {
-                        when {
-                            invalidStationOccurred -> onSpeak("Station code galat lag raha hai ya API pe data nahi hai")
-                            emptyResponseOccurred -> onSpeak("In stations ke beech koi train nahi mili")
-                            lastHttpCode != -1 -> onSpeak("API fail ho gayi, error code $lastHttpCode")
-                            networkErrorOccurred -> onSpeak("Network error aa raha hai")
-                            else -> onSpeak("Koi train nahi mili ya API fail ho gayi")
-                        }
+                        Log.e("TrainAPI", "JSON Parse error in fetchTrainInfo", e)
+                        Handler(Looper.getMainLooper()).post { onSpeak("Data parse karne me error aayi") }
                     }
                 }
-
             } catch (e: Exception) {
-                Log.e("TrainAPI", "Network/Parse error in fetchTrainsBetweenStations", e)
-                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Unknown Error") }
+                Log.e("TrainAPI", "Network exception in fetchTrainInfo", e)
+                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Network Error") }
             }
         }.start()
     }
