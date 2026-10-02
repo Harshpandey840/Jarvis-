@@ -36,6 +36,11 @@ sealed class Command {
     data class TrainStatus(val trainNumber: String) : Command()
     data class TrainInfo(val query: String) : Command()
 
+    // Flights
+    object TrackFlights : Command()
+    data class SearchFlight(val query: String) : Command()
+    object FirstFlightDetails : Command()
+
     // Phase 3 Extensions
     object JarvisVision : Command()
     object EditVideo : Command()
