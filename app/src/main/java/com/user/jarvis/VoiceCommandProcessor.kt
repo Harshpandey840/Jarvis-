@@ -805,6 +805,25 @@ object VoiceCommandProcessor {
         }
 
         // ========================================================
+        // FLIGHT TRACKING
+        // ========================================================
+
+        if (containsAny(norm, "track flight", "tracked flight", "flight tracker", "refresh flight")) {
+            return Command.TrackFlights
+        }
+
+        Regex("(search flight|flight)\\s+([a-zA-Z0-9]+)").find(norm)?.let {
+            val query = it.groupValues[2].trim()
+            if (query.isNotBlank()) {
+                return Command.SearchFlight(query)
+            }
+        }
+
+        if (containsAny(norm, "first flight", "pehle flight ki", "tell me about the first flight")) {
+            return Command.FirstFlightDetails
+        }
+
+        // ========================================================
         // OPEN APP
         // ========================================================
 

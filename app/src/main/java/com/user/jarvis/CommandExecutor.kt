@@ -772,10 +772,69 @@ class CommandExecutor(
                 fetchTrainInfo(command.query, onFinished)
             }
 
+            is Command.TrackFlights -> {
+                onSpeak("Opening flight tracking.")
+                val intent = Intent(context, Class.forName("com.user.jarvis.FlightTrackerActivity")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                onFinished()
+            }
+
+            is Command.SearchFlight -> {
+                onSpeak("Searching for flight ${command.query}.")
+                val intent = Intent(context, Class.forName("com.user.jarvis.FlightTrackerActivity")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("SEARCH_QUERY", command.query)
+                }
+                context.startActivity(intent)
+                onFinished()
+            }
+
+            is Command.FirstFlightDetails -> {
+                handleFirstFlightDetails(onFinished)
+            }
+
             is Command.Unknown -> {
                 onSpeak("Samajh nahi aaya")
             }
         }
+    }
+
+    private fun handleFirstFlightDetails(onFinished: () -> Unit) {
+        val flights = FlightRepository.lastFetchedFlights
+        if (flights.isNotEmpty()) {
+            val first = flights.first()
+            speakFlightDetails(first)
+            onFinished()
+        } else {
+            FlightRepository.fetchFlights(context, onSuccess = { fetchedFlights ->
+                Handler(Looper.getMainLooper()).post {
+                    if (fetchedFlights.isNotEmpty()) {
+                        val first = fetchedFlights.first()
+                        speakFlightDetails(first)
+                    } else {
+                        onSpeak("No tracked flights available.")
+                    }
+                    onFinished()
+                }
+            }, onError = { errorMsg ->
+                Handler(Looper.getMainLooper()).post {
+                    onSpeak(errorMsg)
+                    onFinished()
+                }
+            })
+        }
+    }
+
+    private fun speakFlightDetails(flight: FlightItem) {
+        val route = if (flight.fromCity != "Unknown" && flight.toCity != "Unknown") {
+            "from ${flight.fromCity} to ${flight.toCity}"
+        } else {
+            "currently unavailable"
+        }
+        val message = "The first tracked flight is ${flight.flight}. The aircraft is an ${flight.type}. Its route is $route."
+        onSpeak(message)
     }
 
     private fun fetchTrainInfo(query: String, onFinished: () -> Unit) {

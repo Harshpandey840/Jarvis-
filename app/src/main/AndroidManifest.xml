@@ -51,6 +51,11 @@
             android:theme="@style/Theme.Jarvis" />
 
         <activity
+            android:name=".FlightTrackerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Jarvis" />
+
+        <activity
             android:name=".VisionActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
