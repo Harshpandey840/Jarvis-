@@ -22,11 +22,7 @@ object FlightRepository {
         .build()
 
     fun fetchFlights(context: Context, onSuccess: (List<FlightItem>) -> Unit, onError: (String) -> Unit) {
-        val apiKey = ApiKeyManager.getRapidApiKey(context)
-        if (apiKey.isBlank()) {
-            onError("RapidAPI key nahi hai")
-            return
-        }
+        val apiKey = "604db0b7f8msh4f0e6fff94e701ap11fae6jsnbeac31092692"
 
         Thread {
             try {
