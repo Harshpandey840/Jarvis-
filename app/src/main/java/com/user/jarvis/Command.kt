@@ -31,8 +31,12 @@ sealed class Command {
     object SilentModeOff : Command()
     object LockPhone : Command()
     object GetWeather : Command()
+    
+    // Gaming & Server Status
     object GamingMode : Command()
     object CheckServerStatus : Command()
+
+    // Train Status & Info
     data class TrainStatus(val trainNumber: String) : Command()
     data class TrainInfo(val query: String) : Command()
 
