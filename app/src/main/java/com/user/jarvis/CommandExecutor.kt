@@ -702,6 +702,18 @@ class CommandExecutor(
                 context.startActivity(intent)
             }
 
+            Command.EnableAirTouch -> {
+                AirTouchSettings.setEnabled(context, true)
+                AirTouchForegroundService.start(context)
+                onSpeak("AirTouch enabled sir.")
+            }
+
+            Command.DisableAirTouch -> {
+                AirTouchSettings.setEnabled(context, false)
+                AirTouchForegroundService.stop(context)
+                onSpeak("AirTouch disabled.")
+            }
+
             Command.GamingMode -> {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
