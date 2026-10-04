@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_obsidian">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AirTouch Settings"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp"/>
+
+        <Switch
+            android:id="@+id/switchAirTouch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable AirTouch"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cursor Smoothing:"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <SeekBar
+            android:id="@+id/seekCursorSmoothing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="30"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gesture Cooldown:"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <SeekBar
+            android:id="@+id/seekGestureCooldown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="2000"
+            android:progress="1000"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Gestures"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGesturePinch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pinch (Click)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGestureTwoFingers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Two Fingers (Scroll)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGestureFist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Fist (Back)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGestureOpenPalm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Open Palm (Home)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGestureThumbsUp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Thumbs Up (Home)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Switch
+            android:id="@+id/switchGestureOk"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="OK (Recents)"
+            android:textColor="@color/text_secondary"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable Accessibility Service"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="8dp"/>
+
+        <Button
+            android:id="@+id/btnOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Enable Overlay Permission"
+            android:layout_marginBottom="16dp"/>
+
+    </LinearLayout>
+</ScrollView>

@@ -71,5 +71,6 @@ dependencies {
     // SwipeRefreshLayout
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 
+    implementation "com.google.mediapipe:tasks-vision:0.10.0"
     testImplementation 'junit:junit:4.13.2'
 }

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Jarvis</string>
+    <string name="accessibility_service_description">Used by AirTouch to perform gestures, system actions (Home, Back, Recents, Scroll), and interact with UI elements without touching the screen.</string>
+    <string name="accessibility_service_summary">AirTouch Accessibility Service</string>
 </resources>

@@ -51,5 +51,9 @@ sealed class Command {
     object SecurityLockdown : Command()
     object LocalEnvironmentIntel : Command()
 
+    // AirTouch
+    object EnableAirTouch : Command()
+    object DisableAirTouch : Command()
+
     data class Unknown(val raw: String) : Command()
 }

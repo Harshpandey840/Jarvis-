@@ -148,6 +148,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         setupPulseAnimation()
         lockUiUntilPinVerified()
 
+        if (AirTouchSettings.isEnabled(this)) {
+            AirTouchForegroundService.start(this)
+        }
+
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             try {
@@ -369,16 +373,103 @@ override fun onResume() {
     }
 
     private fun showSettingsDialog() {
-        val options = arrayOf("Voice Settings", "API Key Settings")
+        val options = arrayOf("Voice Settings", "API Key Settings", "AirTouch Settings")
         AlertDialog.Builder(this)
             .setTitle("Settings")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showVoicePicker()
                     1 -> showApiKeySettingsDialog()
+                    2 -> showAirTouchSettingsDialog()
                 }
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showAirTouchSettingsDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_airtouch, null)
+        val switchAirTouch = dialogView.findViewById<android.widget.Switch>(R.id.switchAirTouch)
+        val btnAccessibility = dialogView.findViewById<Button>(R.id.btnAccessibility)
+        val btnOverlay = dialogView.findViewById<Button>(R.id.btnOverlay)
+        val seekCursorSmoothing = dialogView.findViewById<android.widget.SeekBar>(R.id.seekCursorSmoothing)
+
+        val seekGestureCooldown = dialogView.findViewById<android.widget.SeekBar>(R.id.seekGestureCooldown)
+
+        val switchGesturePinch = dialogView.findViewById<android.widget.Switch>(R.id.switchGesturePinch)
+        val switchGestureTwoFingers = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureTwoFingers)
+        val switchGestureFist = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureFist)
+        val switchGestureOpenPalm = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureOpenPalm)
+        val switchGestureThumbsUp = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureThumbsUp)
+        val switchGestureOk = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureOk)
+
+        switchAirTouch.isChecked = AirTouchSettings.isEnabled(this)
+        seekCursorSmoothing.progress = AirTouchSettings.getCursorSmoothing(this)
+        seekGestureCooldown.progress = AirTouchSettings.getGestureCooldown(this)
+
+        switchGesturePinch.isChecked = AirTouchSettings.isGestureEnabled(this, "PINCH")
+        switchGestureTwoFingers.isChecked = AirTouchSettings.isGestureEnabled(this, "TWO_FINGERS")
+        switchGestureFist.isChecked = AirTouchSettings.isGestureEnabled(this, "FIST")
+        switchGestureOpenPalm.isChecked = AirTouchSettings.isGestureEnabled(this, "OPEN_PALM")
+        switchGestureThumbsUp.isChecked = AirTouchSettings.isGestureEnabled(this, "THUMBS_UP")
+        switchGestureOk.isChecked = AirTouchSettings.isGestureEnabled(this, "OK")
+
+        switchAirTouch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                AirTouchSettings.setEnabled(this, true)
+                AirTouchForegroundService.start(this)
+            } else {
+                AirTouchSettings.setEnabled(this, false)
+                AirTouchForegroundService.stop(this)
+            }
+        }
+
+        switchGesturePinch.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "PINCH", isChecked) }
+        switchGestureTwoFingers.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "TWO_FINGERS", isChecked) }
+        switchGestureFist.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "FIST", isChecked) }
+        switchGestureOpenPalm.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "OPEN_PALM", isChecked) }
+        switchGestureThumbsUp.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "THUMBS_UP", isChecked) }
+        switchGestureOk.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "OK", isChecked) }
+
+        seekCursorSmoothing.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    AirTouchSettings.setCursorSmoothing(this@MainActivity, progress)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        seekGestureCooldown.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    AirTouchSettings.setGestureCooldown(this@MainActivity, progress)
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        btnAccessibility.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+
+        btnOverlay.setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } else {
+                Toast.makeText(this, "Overlay permission is already granted", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setPositiveButton("Close", null)
             .show()
     }
 
