@@ -60,6 +60,11 @@
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <activity
+            android:name=".gestures.ui.CustomGesturesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Jarvis" />
+
         <service
             android:name=".JarvisListenerService"
             android:exported="false"

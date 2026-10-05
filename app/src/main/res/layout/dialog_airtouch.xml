@@ -57,63 +57,12 @@
             android:progress="1000"
             android:layout_marginBottom="16dp"/>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Gestures"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGesturePinch"
+        <Button
+            android:id="@+id/btnCustomGestures"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Pinch (Click)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGestureTwoFingers"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Two Fingers (Scroll)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGestureFist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Fist (Back)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGestureOpenPalm"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Open Palm (Home)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGestureThumbsUp"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Thumbs Up (Home)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
-
-        <Switch
-            android:id="@+id/switchGestureOk"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="OK (Recents)"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp"/>
+            android:text="Advanced Custom Gestures"
+            android:layout_marginBottom="16dp"/>
 
         <Button
             android:id="@+id/btnAccessibility"

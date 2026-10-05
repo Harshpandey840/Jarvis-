@@ -54,6 +54,7 @@ sealed class Command {
     // AirTouch
     object EnableAirTouch : Command()
     object DisableAirTouch : Command()
+    data class SetGesture(val gestureShape: String, val actionTarget: String) : Command()
 
     data class Unknown(val raw: String) : Command()
 }
