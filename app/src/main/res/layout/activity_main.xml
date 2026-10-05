@@ -64,8 +64,59 @@
         app:layout_constraintTop_toTopOf="@id/notesListButton"
         app:layout_constraintStart_toEndOf="@id/notesListButton" />
 
+
+    <LinearLayout
+        android:id="@+id/gaugesLeft"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/titleText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp">
+
+        <com.user.jarvis.GaugeView
+            android:id="@+id/gaugeCpu"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginBottom="16dp"/>
+
+        <com.user.jarvis.GaugeView
+            android:id="@+id/gaugeRam"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginBottom="16dp"/>
+
+        <com.user.jarvis.GaugeView
+            android:id="@+id/gaugeBattery"
+            android:layout_width="80dp"
+            android:layout_height="80dp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/gaugesRight"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/titleText"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp">
+
+        <com.user.jarvis.GaugeView
+            android:id="@+id/gaugeStorage"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginBottom="16dp"/>
+
+        <com.user.jarvis.WaveformView
+            android:id="@+id/waveformView"
+            android:layout_width="80dp"
+            android:layout_height="80dp"/>
+    </LinearLayout>
+
     <!-- CENTER ORB & STATE -->
-    <com.user.jarvis.ParticleSphereView
+    <com.user.jarvis.JarvisCoreView
         android:id="@+id/particleOrb"
         android:layout_width="140dp"
         android:layout_height="140dp"
