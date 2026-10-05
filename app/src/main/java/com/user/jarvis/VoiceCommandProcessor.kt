@@ -784,8 +784,20 @@ object VoiceCommandProcessor {
             return Command.JarvisVision
         }
 
-        if (containsAny(norm, "gaming mode on", "launch free fire", "game start karo")) {
-            return Command.GamingMode
+        if (containsAny(norm, "gaming mode on", "start gaming mode", "game start karo")) {
+            return Command.GamingMode(true)
+        }
+
+        if (containsAny(norm, "gaming mode off", "stop gaming mode", "game band karo")) {
+            return Command.GamingMode(false)
+        }
+
+        if (containsAny(norm, "aim assist on", "crosshair on")) {
+            return Command.AimAssist(true)
+        }
+
+        if (containsAny(norm, "aim assist off", "crosshair off")) {
+            return Command.AimAssist(false)
         }
 
         if (containsAny(norm, "edit video", "video edit")) {

@@ -33,7 +33,8 @@ sealed class Command {
     object GetWeather : Command()
     
     // Gaming & Server Status
-    object GamingMode : Command()
+    data class GamingMode(val enable: Boolean) : Command()
+    data class AimAssist(val enable: Boolean) : Command()
     object CheckServerStatus : Command()
 
     // Train Status & Info

@@ -55,6 +55,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var jarvisReplyText: TextView
     private lateinit var chatScrollView: ScrollView
     private lateinit var chatContainer: LinearLayout
+    private lateinit var gamingStatusText: TextView
+    private lateinit var aimAssistStatusText: TextView
+    private lateinit var gamingModeToggleBtn: Button
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
@@ -98,6 +101,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         jarvisReplyText = findViewById(R.id.jarvisReplyText)
         chatScrollView = findViewById(R.id.chatScrollView)
         chatContainer = findViewById(R.id.chatContainer)
+        gamingStatusText = findViewById(R.id.gamingStatusText)
+        aimAssistStatusText = findViewById(R.id.aimAssistStatusText)
+        gamingModeToggleBtn = findViewById(R.id.gamingModeToggleBtn)
         statusDot = findViewById(R.id.statusDot)
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
@@ -133,6 +139,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 )  
 
         tts = TextToSpeech(this, this)
+
+        gamingModeToggleBtn.setOnClickListener {
+            val manager = GamingModeManager(this)
+            if (manager.isGamingModeOn) {
+                manager.disableGamingMode { msg -> speak(msg) }
+            } else {
+                manager.enableGamingMode { msg -> speak(msg) }
+            }
+        }
+
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
         speechRecognizer.setRecognitionListener(recognitionListener)
 
@@ -241,8 +257,34 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 .show()
         }
     }
+    private val gamingModeReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateGamingStatus()
+        }
+    }
+
+    private fun updateGamingStatus() {
+        val manager = GamingModeManager(this)
+        gamingStatusText.text = "Gaming Mode: ${if (manager.isGamingModeOn) "ON" else "OFF"}"
+        aimAssistStatusText.text = "Aim Assist: ${if (manager.isAimAssistOn) "ON" else "OFF"}"
+        gamingModeToggleBtn.text = if (manager.isGamingModeOn) "Stop Gaming" else "Start Gaming"
+
+        val game = manager.currentGame
+        if (manager.isGamingModeOn && game != null) {
+            gamingStatusText.text = "Gaming Mode: ON ($game)"
+        }
+    }
+
 override fun onResume() {
         super.onResume()
+        updateGamingStatus()
+
+        val filter = android.content.IntentFilter("com.user.jarvis.GAMING_MODE_UPDATED")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(gamingModeReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(gamingModeReceiver, filter)
+        }
         if (FaceSecurityPrefs.isEnabled(this) && FaceSecurityPrefs.getReferenceFacePath(this) != null) {
             val intent = Intent(this, FaceSecurityService::class.java)
             try {
@@ -748,6 +790,13 @@ override fun onResume() {
 
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+    override fun onPause() {
+        super.onPause()
+        try {
+            unregisterReceiver(gamingModeReceiver)
+        } catch (e: Exception) {}
+    }
 
     override fun onDestroy() {
         speechRecognizer.destroy()

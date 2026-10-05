@@ -116,6 +116,10 @@
             android:exported="false"
             android:foregroundServiceType="camera" />
 
+        <service
+            android:name=".AimAssistOverlayService"
+            android:exported="false" />
+
     </application>
 
 </manifest>
