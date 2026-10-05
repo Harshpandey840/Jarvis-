@@ -57,6 +57,8 @@ class CommandExecutor(
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
         .build()
 
+    private val gamingModeManager = GamingModeManager(context)
+
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
 
@@ -738,19 +740,19 @@ class CommandExecutor(
                 }
             }
 
-            Command.GamingMode -> {
-                val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                val targetVolume = (maxVolume * 0.85).toInt()
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, AudioManager.FLAG_SHOW_UI)
-
-                val intent = context.packageManager.getLaunchIntentForPackage("com.dts.freefiremax")
-                if (intent != null) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                    onSpeak("Gaming mode activated for BlackHawk. Good luck, sir.")
+            is Command.GamingMode -> {
+                if (command.enable) {
+                    gamingModeManager.enableGamingMode(onSpeak)
                 } else {
-                    onSpeak("Free Fire MAX is not installed, sir.")
+                    gamingModeManager.disableGamingMode(onSpeak)
+                }
+            }
+
+            is Command.AimAssist -> {
+                if (command.enable) {
+                    gamingModeManager.enableAimAssist(onSpeak)
+                } else {
+                    gamingModeManager.disableAimAssist(onSpeak)
                 }
             }
 
