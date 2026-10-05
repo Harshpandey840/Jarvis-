@@ -142,10 +142,14 @@ class GamingModeManager private constructor(private val context: Context) {
             }
         }
 
-        return if (currentForegroundPackage != null && KNOWN_GAMES.contains(currentForegroundPackage)) {
-            currentForegroundPackage
+        if (currentForegroundPackage != null && KNOWN_GAMES.contains(currentForegroundPackage)) {
+            Log.i("GamingModeManager", "Detected supported game package: $currentForegroundPackage")
+            return currentForegroundPackage
         } else {
-            null
+            if (currentForegroundPackage != null) {
+                Log.d("GamingModeManager", "Detected package (not a known game): $currentForegroundPackage")
+            }
+            return null
         }
     }
 
@@ -162,9 +166,10 @@ class GamingModeManager private constructor(private val context: Context) {
         }
 
         if (!wasAlreadyOn) {
+            Log.i("GamingModeManager", "Gaming Mode starting...")
             // Handle settings write permission gracefully
             if (!Settings.System.canWrite(context)) {
-                Log.w("GamingModeManager", "Permission denied: WRITE_SETTINGS. Cannot adjust screen timeout natively.")
+                Log.w("GamingModeManager", "Permission denied: WRITE_SETTINGS. Cannot adjust screen timeout natively. (Permission failure logged)")
                 if (onSpeak != null) {
                     val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS)
                     intent.data = android.net.Uri.parse("package:${context.packageName}")
@@ -197,7 +202,7 @@ class GamingModeManager private constructor(private val context: Context) {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, AudioManager.FLAG_SHOW_UI)
                     Log.i("GamingModeManager", "Optimization applied: DND/Ringer mode adjusted to vibrate")
                 } else {
-                    Log.w("GamingModeManager", "Permission denied: Notification Policy Access. Cannot modify DND settings.")
+                    Log.w("GamingModeManager", "Permission denied: Notification Policy Access. Cannot modify DND settings. (Permission failure logged)")
                     if (onSpeak != null) {
                         val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -229,6 +234,11 @@ class GamingModeManager private constructor(private val context: Context) {
                 Log.i("GamingModeManager", "Gaming Mode Active. No specific game detected.")
                 if (!wasAlreadyOn) onSpeak?.invoke("Gaming mode activated. Optimizing background activity.")
             }
+        }
+
+        // Automatically start aim assist if manually enabled and permission exists
+        if (isManuallyEnabled && Settings.canDrawOverlays(context)) {
+            enableAimAssist(null)
         }
 
         // Notify UI
@@ -287,6 +297,10 @@ class GamingModeManager private constructor(private val context: Context) {
         isManuallyEnabled = false
         currentGame = null
 
+        if (isAimAssistOn) {
+            disableAimAssist(null)
+        }
+
         val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
         context.sendBroadcast(updateIntent)
 
@@ -311,21 +325,23 @@ class GamingModeManager private constructor(private val context: Context) {
         }
 
         if (!Settings.canDrawOverlays(context)) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-            intent.data = android.net.Uri.parse("package:${context.packageName}")
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            onSpeak?.invoke("Please grant display over other apps permission for the crosshair overlay, sir.")
+            Log.w("GamingModeManager", "Permission denied: SYSTEM_ALERT_WINDOW. Cannot show Aim Assist. (Permission failure logged)")
+            if (onSpeak != null) {
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                intent.data = android.net.Uri.parse("package:${context.packageName}")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                onSpeak.invoke("Please grant display over other apps permission for the crosshair overlay, sir.")
+            }
             return
         }
 
+        Log.i("GamingModeManager", "Starting aim overlay service...")
         val serviceIntent = Intent(context, AimAssistOverlayService::class.java)
         context.startService(serviceIntent)
 
-        isAimAssistOn = true
-
-        val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
-        context.sendBroadcast(updateIntent)
+        // We do NOT set isAimAssistOn = true here.
+        // We wait for AimAssistOverlayService to successfully create its view.
 
         onSpeak?.invoke("Aim assist overlay engaged.")
     }
@@ -336,13 +352,12 @@ class GamingModeManager private constructor(private val context: Context) {
             return
         }
 
+        Log.i("GamingModeManager", "Stopping aim overlay service...")
         val serviceIntent = Intent(context, AimAssistOverlayService::class.java)
         context.stopService(serviceIntent)
 
-        isAimAssistOn = false
-
-        val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
-        context.sendBroadcast(updateIntent)
+        // We do NOT set isAimAssistOn = false here.
+        // We wait for AimAssistOverlayService to successfully remove its view.
 
         onSpeak?.invoke("Aim assist overlay disabled.")
     }

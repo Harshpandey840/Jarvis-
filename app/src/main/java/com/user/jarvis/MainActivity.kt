@@ -56,8 +56,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var chatScrollView: ScrollView
     private lateinit var chatContainer: LinearLayout
     private lateinit var gamingStatusText: TextView
+    private lateinit var gamingGameText: TextView
+    private lateinit var gamingOptimizationText: TextView
     private lateinit var aimAssistStatusText: TextView
     private lateinit var gamingModeToggleBtn: Button
+    private lateinit var aimAssistToggleBtn: Button
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
@@ -106,8 +109,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         chatScrollView = findViewById(R.id.chatScrollView)
         chatContainer = findViewById(R.id.chatContainer)
         gamingStatusText = findViewById(R.id.gamingStatusText)
+        gamingGameText = findViewById(R.id.gamingGameText)
+        gamingOptimizationText = findViewById(R.id.gamingOptimizationText)
         aimAssistStatusText = findViewById(R.id.aimAssistStatusText)
         gamingModeToggleBtn = findViewById(R.id.gamingModeToggleBtn)
+        aimAssistToggleBtn = findViewById(R.id.aimAssistToggleBtn)
         statusDot = findViewById(R.id.statusDot)
         statusLabel = findViewById(R.id.statusLabel)
         micButton = findViewById(R.id.micButton)
@@ -159,6 +165,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 manager.disableGamingMode { msg -> speak(msg) }
             } else {
                 manager.enableGamingMode { msg -> speak(msg) }
+            }
+        }
+
+        aimAssistToggleBtn.setOnClickListener {
+            val manager = GamingModeManager.getInstance(this)
+            if (manager.isAimAssistOn) {
+                manager.disableAimAssist { msg -> speak(msg) }
+            } else {
+                manager.enableAimAssist { msg -> speak(msg) }
             }
         }
 
@@ -279,13 +294,38 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun updateGamingStatus() {
         val manager = GamingModeManager.getInstance(this)
         gamingStatusText.text = "Gaming Mode: ${if (manager.isGamingModeOn) "ON" else "OFF"}"
-        aimAssistStatusText.text = "Aim Assist: ${if (manager.isAimAssistOn) "ON" else "OFF"}"
-        gamingModeToggleBtn.text = if (manager.isGamingModeOn) "Stop Gaming" else "Start Gaming"
 
         val game = manager.currentGame
-        if (manager.isGamingModeOn && game != null) {
-            gamingStatusText.text = "Gaming Mode: ON ($game)"
+        if (manager.isGamingModeOn) {
+            gamingGameText.text = "Game: ${game ?: "No game detected"}"
+            // Tangible optimization: keep screen on while app is in foreground and gaming mode is on
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            gamingGameText.text = "Game: None"
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        val hasSettings = Settings.System.canWrite(this)
+        val hasDnd = notificationManager.isNotificationPolicyAccessGranted
+
+        if (manager.isGamingModeOn) {
+            gamingOptimizationText.text = "Optimization: ${if (hasSettings && hasDnd) "ACTIVE" else "LIMITED"}"
+        } else {
+            gamingOptimizationText.text = "Optimization: NONE"
+        }
+
+        val overlayGranted = Settings.canDrawOverlays(this)
+        if (manager.isAimAssistOn) {
+            aimAssistStatusText.text = "Aim Assist: ON"
+        } else if (!overlayGranted) {
+            aimAssistStatusText.text = "Aim Assist: PERMISSION REQUIRED"
+        } else {
+            aimAssistStatusText.text = "Aim Assist: OFF"
+        }
+
+        gamingModeToggleBtn.text = if (manager.isGamingModeOn) "Stop Gaming" else "Start Gaming"
+        aimAssistToggleBtn.text = if (manager.isAimAssistOn) "Crosshair: OFF" else "Crosshair: ON"
     }
 
     private fun updateSystemSettingsUI() {
