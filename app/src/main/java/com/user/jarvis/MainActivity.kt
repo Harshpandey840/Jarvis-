@@ -154,7 +154,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         tts = TextToSpeech(this, this)
 
         gamingModeToggleBtn.setOnClickListener {
-            val manager = GamingModeManager(this)
+            val manager = GamingModeManager.getInstance(this)
             if (manager.isGamingModeOn) {
                 manager.disableGamingMode { msg -> speak(msg) }
             } else {
@@ -277,7 +277,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun updateGamingStatus() {
-        val manager = GamingModeManager(this)
+        val manager = GamingModeManager.getInstance(this)
         gamingStatusText.text = "Gaming Mode: ${if (manager.isGamingModeOn) "ON" else "OFF"}"
         aimAssistStatusText.text = "Aim Assist: ${if (manager.isAimAssistOn) "ON" else "OFF"}"
         gamingModeToggleBtn.text = if (manager.isGamingModeOn) "Stop Gaming" else "Start Gaming"

@@ -57,7 +57,7 @@ class CommandExecutor(
         .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
         .build()
 
-    private val gamingModeManager = GamingModeManager(context)
+    private val gamingModeManager = GamingModeManager.getInstance(context)
 
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
