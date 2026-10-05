@@ -91,10 +91,11 @@
         android:id="@+id/gamingStatusContainer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         app:layout_constraintTop_toBottomOf="@id/stateLabel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:gravity="center"
         android:layout_marginTop="8dp">
 
         <TextView
@@ -103,8 +104,23 @@
             android:layout_height="wrap_content"
             android:text="Gaming Mode: OFF"
             android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:paddingEnd="16dp" />
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/gamingGameText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Game: None"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/gamingOptimizationText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Optimization: NONE"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/aimAssistStatusText"
@@ -112,18 +128,35 @@
             android:layout_height="wrap_content"
             android:text="Aim Assist: OFF"
             android:textColor="@color/text_secondary"
-            android:textSize="12sp"
-            android:paddingEnd="16dp" />
+            android:textSize="12sp" />
 
-        <Button
-            android:id="@+id/gamingModeToggleBtn"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Start Gaming"
-            android:textSize="10sp"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:padding="8dp" />
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <Button
+                android:id="@+id/gamingModeToggleBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start Gaming"
+                android:textSize="10sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:padding="8dp"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/aimAssistToggleBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Toggle Crosshair"
+                android:textSize="10sp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:padding="8dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

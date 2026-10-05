@@ -82,8 +82,23 @@ class AimAssistOverlayService : Service() {
 
         try {
             windowManager.addView(crosshairView, layoutParams)
+
+            val manager = GamingModeManager.getInstance(this)
+            manager.isAimAssistOn = true
+
+            android.util.Log.i("AimAssistOverlayService", "Aim assist overlay started successfully.")
+
+            val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
+            sendBroadcast(updateIntent)
         } catch (e: Exception) {
             e.printStackTrace()
+            val manager = GamingModeManager.getInstance(this)
+            manager.isAimAssistOn = false
+
+            android.util.Log.e("AimAssistOverlayService", "Failed to start aim assist overlay. Permission failure logged.", e)
+
+            val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
+            sendBroadcast(updateIntent)
         }
     }
 
@@ -100,5 +115,13 @@ class AimAssistOverlayService : Service() {
                 e.printStackTrace()
             }
         }
+
+        val manager = GamingModeManager.getInstance(this)
+        manager.isAimAssistOn = false
+
+        android.util.Log.i("AimAssistOverlayService", "Aim assist overlay stopped.")
+
+        val updateIntent = Intent("com.user.jarvis.GAMING_MODE_UPDATED")
+        sendBroadcast(updateIntent)
     }
 }
