@@ -71,6 +71,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var commandExecutor: CommandExecutor
     private var isJarvisRunning = false
+
+    private lateinit var systemSettingsStatusText: TextView
+    private lateinit var systemSettingsEnableBtn: Button
+    private lateinit var systemSettingsManager: SystemSettingsManager
     private var wrongPinAttempts = 0
 
     private val requiredPermissions = arrayOf(
@@ -114,6 +118,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
         particleOrb = findViewById(R.id.particleOrb)
         micGlow = findViewById(R.id.micGlow)
+
+        systemSettingsStatusText = findViewById(R.id.systemSettingsStatusText)
+        systemSettingsEnableBtn = findViewById(R.id.systemSettingsEnableBtn)
+
+        systemSettingsManager = SystemSettingsManager(this)
+
+        systemSettingsEnableBtn.setOnClickListener {
+            systemSettingsManager.requestWriteSettingsPermission()
+        }
 
         youSaidText.visibility = View.INVISIBLE
         jarvisReplyText.visibility = View.INVISIBLE
@@ -275,9 +288,21 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun updateSystemSettingsUI() {
+        val isAllowed = systemSettingsManager.isWriteSettingsAllowed()
+        if (isAllowed) {
+            systemSettingsStatusText.text = "Modify system settings: Allowed"
+            systemSettingsEnableBtn.visibility = View.GONE
+        } else {
+            systemSettingsStatusText.text = "Modify system settings: Not allowed"
+            systemSettingsEnableBtn.visibility = View.VISIBLE
+        }
+    }
+
 override fun onResume() {
         super.onResume()
         updateGamingStatus()
+        updateSystemSettingsUI()
 
         val filter = android.content.IntentFilter("com.user.jarvis.GAMING_MODE_UPDATED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
