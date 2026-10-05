@@ -57,12 +57,12 @@ class AirTouchForegroundService : Service(), LifecycleOwner {
 
         cursorOverlayManager = CursorOverlayManager(applicationContext)
         cursorOverlayManager?.show()
-        val gestureRecognizer = GestureRecognizer(applicationContext)
+        val gestureEngine = com.user.jarvis.gestures.GestureEngine(applicationContext)
 
         // Pass "this" (the service) as the context and LifecycleOwner
         handLandmarkerManager = HandLandmarkerManager(this, object : HandLandmarkerManager.LandmarkListener {
             override fun onLandmarks(landmarks: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>, imageWidth: Int, imageHeight: Int) {
-                gestureRecognizer.processLandmarks(landmarks, imageWidth, imageHeight, cursorOverlayManager)
+                gestureEngine.processLandmarks(landmarks, imageWidth, imageHeight, cursorOverlayManager)
             }
             override fun onError(error: String) {
                 Log.e("AirTouchService", "Hand tracking error: $error")

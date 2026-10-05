@@ -396,23 +396,11 @@ override fun onResume() {
 
         val seekGestureCooldown = dialogView.findViewById<android.widget.SeekBar>(R.id.seekGestureCooldown)
 
-        val switchGesturePinch = dialogView.findViewById<android.widget.Switch>(R.id.switchGesturePinch)
-        val switchGestureTwoFingers = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureTwoFingers)
-        val switchGestureFist = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureFist)
-        val switchGestureOpenPalm = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureOpenPalm)
-        val switchGestureThumbsUp = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureThumbsUp)
-        val switchGestureOk = dialogView.findViewById<android.widget.Switch>(R.id.switchGestureOk)
+        val btnCustomGestures = dialogView.findViewById<Button>(R.id.btnCustomGestures)
 
         switchAirTouch.isChecked = AirTouchSettings.isEnabled(this)
         seekCursorSmoothing.progress = AirTouchSettings.getCursorSmoothing(this)
         seekGestureCooldown.progress = AirTouchSettings.getGestureCooldown(this)
-
-        switchGesturePinch.isChecked = AirTouchSettings.isGestureEnabled(this, "PINCH")
-        switchGestureTwoFingers.isChecked = AirTouchSettings.isGestureEnabled(this, "TWO_FINGERS")
-        switchGestureFist.isChecked = AirTouchSettings.isGestureEnabled(this, "FIST")
-        switchGestureOpenPalm.isChecked = AirTouchSettings.isGestureEnabled(this, "OPEN_PALM")
-        switchGestureThumbsUp.isChecked = AirTouchSettings.isGestureEnabled(this, "THUMBS_UP")
-        switchGestureOk.isChecked = AirTouchSettings.isGestureEnabled(this, "OK")
 
         switchAirTouch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
@@ -424,12 +412,9 @@ override fun onResume() {
             }
         }
 
-        switchGesturePinch.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "PINCH", isChecked) }
-        switchGestureTwoFingers.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "TWO_FINGERS", isChecked) }
-        switchGestureFist.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "FIST", isChecked) }
-        switchGestureOpenPalm.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "OPEN_PALM", isChecked) }
-        switchGestureThumbsUp.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "THUMBS_UP", isChecked) }
-        switchGestureOk.setOnCheckedChangeListener { _, isChecked -> AirTouchSettings.setGestureEnabled(this, "OK", isChecked) }
+        btnCustomGestures.setOnClickListener {
+            startActivity(Intent(this, com.user.jarvis.gestures.ui.CustomGesturesActivity::class.java))
+        }
 
         seekCursorSmoothing.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {

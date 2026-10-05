@@ -714,6 +714,30 @@ class CommandExecutor(
                 onSpeak("AirTouch disabled.")
             }
 
+            is Command.SetGesture -> {
+                val repository = com.user.jarvis.gestures.GestureRepository(context)
+                val allGestures = repository.getGestures().toMutableList()
+
+                // Map strings to Enums safely
+                val shapeEnum = try { com.user.jarvis.gestures.models.HandShape.valueOf(command.gestureShape.uppercase()) } catch (e: Exception) { null }
+                val actionEnum = try { com.user.jarvis.gestures.models.GestureAction.valueOf(command.actionTarget.uppercase()) } catch (e: Exception) { null }
+
+                if (shapeEnum != null && actionEnum != null) {
+                    // Find if gesture config already exists for this shape and update it
+                    val index = allGestures.indexOfFirst { it.handShape == shapeEnum }
+                    if (index != -1) {
+                        allGestures[index] = allGestures[index].copy(action = actionEnum, enabled = true)
+                    } else {
+                        // Or add new if it makes sense, though currently we have a fixed set of configs mostly
+                        allGestures.add(com.user.jarvis.gestures.models.GestureConfig("g_voice", "Voice Custom", shapeEnum, com.user.jarvis.gestures.models.Direction.NONE, actionEnum, true))
+                    }
+                    repository.saveGestures(allGestures)
+                    onSpeak("Gesture updated sir.")
+                } else {
+                    onSpeak("Sorry, I couldn't understand that gesture or action.")
+                }
+            }
+
             Command.GamingMode -> {
                 val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
                 val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
