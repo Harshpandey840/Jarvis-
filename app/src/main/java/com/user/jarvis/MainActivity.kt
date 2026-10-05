@@ -82,7 +82,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.SEND_SMS,
         Manifest.permission.READ_CONTACTS,
         Manifest.permission.CALL_PHONE,
         Manifest.permission.CAMERA,

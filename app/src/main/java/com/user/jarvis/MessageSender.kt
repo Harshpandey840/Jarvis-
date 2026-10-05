@@ -12,6 +12,8 @@ class MessageSender(private val context: Context) {
             val parts = smsManager.divideMessage(message)
             smsManager.sendMultipartTextMessage(number, null, parts, null, null)
             true
+        } catch (se: SecurityException) {
+            throw se
         } catch (e: Exception) {
             false
         }
