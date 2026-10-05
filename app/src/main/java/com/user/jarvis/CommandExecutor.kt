@@ -90,9 +90,7 @@ class CommandExecutor(
 
             is Command.SendMessage -> {
 
-                if (!hasPermission(Manifest.permission.SEND_SMS) ||
-                    !hasPermission(Manifest.permission.READ_CONTACTS)
-                ) {
+                if (!hasPermission(Manifest.permission.READ_CONTACTS)) {
                     onSpeak("Permission nahi hai message bhejne ki")
                     return
                 }
@@ -105,16 +103,39 @@ class CommandExecutor(
                     return
                 }
 
-                val sent =
-                    messageSender.sendSms(
-                        number,
-                        command.text
-                    )
+                if (!hasPermission(Manifest.permission.SEND_SMS)) {
+                    val smsPrefs = context.getSharedPreferences("jarvis_sms_prefs", Context.MODE_PRIVATE)
+                    val alreadyRequested = smsPrefs.getBoolean("sms_permission_requested", false)
 
-                if (sent) {
-                    onSpeak("${command.contactName} ko message bhej diya")
-                } else {
-                    onSpeak("Message nahi bhej paya")
+                    if (!alreadyRequested && context is android.app.Activity) {
+                        smsPrefs.edit().putBoolean("sms_permission_requested", true).apply()
+                        androidx.core.app.ActivityCompat.requestPermissions(
+                            context,
+                            arrayOf(Manifest.permission.SEND_SMS),
+                            101
+                        )
+                        onSpeak("SMS permission allow karo aur phir se bolo")
+                        return
+                    } else {
+                        fallbackToManualSms(number, command.text)
+                        return
+                    }
+                }
+
+                try {
+                    val sent =
+                        messageSender.sendSms(
+                            number,
+                            command.text
+                        )
+
+                    if (sent) {
+                        onSpeak("${command.contactName} ko message bhej diya")
+                    } else {
+                        onSpeak("Message nahi bhej paya")
+                    }
+                } catch (se: SecurityException) {
+                    fallbackToManualSms(number, command.text)
                 }
             }
 
@@ -1579,6 +1600,20 @@ class CommandExecutor(
             }
 
         } catch (_: Exception) {
+        }
+    }
+
+    private fun fallbackToManualSms(number: String, text: String) {
+        try {
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("smsto:$number")
+                putExtra("sms_body", text)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            onSpeak("SMS access is restricted on this device. You can send the message manually.")
+        } catch (e: Exception) {
+            onSpeak("Manual SMS nahi khul paya")
         }
     }
 
