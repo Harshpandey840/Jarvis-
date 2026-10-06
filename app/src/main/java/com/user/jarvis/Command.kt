@@ -36,6 +36,10 @@ sealed class Command {
     data class GamingMode(val enable: Boolean) : Command()
     data class AimAssist(val enable: Boolean) : Command()
     object CheckServerStatus : Command()
+    object ShowGamingStats : Command()
+    object OptimizeGaming : Command()
+    object ShowFreeFireProfile : Command()
+    data class UpdateFreeFireProfile(val setting: String, val value: Int) : Command()
 
     // Train Status & Info
     data class TrainStatus(val trainNumber: String) : Command()

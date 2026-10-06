@@ -792,6 +792,18 @@ object VoiceCommandProcessor {
             return Command.GamingMode(false)
         }
 
+        if (containsAny(norm, "show gaming stats", "gaming stats", "game stats dikhao")) {
+            return Command.ShowGamingStats
+        }
+
+        if (containsAny(norm, "optimize gaming", "game optimize karo", "optimize game")) {
+            return Command.OptimizeGaming
+        }
+
+        if (containsAny(norm, "free fire profile", "show free fire profile", "free fire sensitivity")) {
+            return Command.ShowFreeFireProfile
+        }
+
         if (containsAny(norm, "aim assist on", "crosshair on")) {
             return Command.AimAssist(true)
         }
