@@ -8,7 +8,7 @@ import kotlin.math.sin
 
 object JarvisSoundManager {
 
-    private fun playTone(startFreq: Double, endFreq: Double, durationMs: Int, volume: Float = 0.35f) {
+    private fun playTone(startFreq: Double, endFreq: Double, durationMs: Int, volume: Float = 0.35f, modulate: Boolean = false) {
         Thread {
             try {
                 val sampleRate = 44100
@@ -18,13 +18,28 @@ object JarvisSoundManager {
                 for (i in 0 until numSamples) {
                     val t = i.toDouble() / sampleRate
                     val progress = i.toDouble() / numSamples
-                    val freq = startFreq + (endFreq - startFreq) * progress
+
+                    // Frequency glide
+                    var freq = startFreq + (endFreq - startFreq) * progress
+
+                    if (modulate) {
+                        freq += sin(2.0 * PI * 15.0 * t) * 50.0 // Add wobble effect
+                    }
+
                     val envelope = when {
-                        progress < 0.1 -> progress / 0.1
-                        progress > 0.8 -> (1.0 - progress) / 0.2
+                        progress < 0.1 -> progress / 0.1 // Fast attack
+                        progress > 0.7 -> (1.0 - progress) / 0.3 // Smooth release
                         else -> 1.0
                     }
-                    val sample = sin(2.0 * PI * freq * t) * envelope * volume
+
+                    // Create richer sound by mixing sine and square-ish harmonics
+                    val baseSample = sin(2.0 * PI * freq * t)
+                    val harmonicSample = sin(4.0 * PI * freq * t) * 0.3
+                    var sample = (baseSample + harmonicSample) * envelope * volume
+
+                    if (sample > 1.0) sample = 1.0
+                    if (sample < -1.0) sample = -1.0
+
                     buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
                 }
 
@@ -55,11 +70,30 @@ object JarvisSoundManager {
         }.start()
     }
 
-    fun playStartup() { playTone(300.0, 800.0, 600, 0.4f) }
-    fun playListening() { playTone(600.0, 1200.0, 200, 0.3f) }
-    fun playProcessing() { playTone(1200.0, 1000.0, 300, 0.25f) }
-    fun playSpeaking() { playTone(800.0, 850.0, 150, 0.2f) }
-    fun playSuccess() { playTone(800.0, 1400.0, 250, 0.3f) }
-    fun playError() { playTone(400.0, 200.0, 350, 0.3f) }
-    fun playClick() { playTone(1500.0, 1500.0, 50, 0.15f) }
+    // Deep futuristic startup tone
+    fun playStartup() { playTone(150.0, 450.0, 800, 0.4f, modulate = true) }
+
+    // Short recognizable wake
+    fun playListening() { playTone(800.0, 1400.0, 150, 0.3f) }
+
+    // Low scanning data sound
+    fun playProcessing() { playTone(400.0, 380.0, 400, 0.25f, modulate = true) }
+
+    // Slight speak initiation
+    fun playSpeaking() { playTone(900.0, 900.0, 100, 0.15f) }
+
+    // Clean confirmation tone
+    fun playSuccess() { playTone(800.0, 1600.0, 300, 0.3f) }
+
+    // Warning tone
+    fun playError() { playTone(300.0, 150.0, 400, 0.4f) }
+
+    // Subtle Notification
+    fun playNotificationSound() { playTone(1200.0, 1200.0, 200, 0.2f) }
+
+    // Shutdown
+    fun playShutdownSound() { playTone(400.0, 100.0, 700, 0.4f) }
+
+    // UI Click
+    fun playClick() { playTone(1600.0, 1600.0, 40, 0.1f) }
 }
