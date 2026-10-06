@@ -67,8 +67,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var gamingGameText: TextView
     private lateinit var gamingOptimizationText: TextView
     private lateinit var aimAssistStatusText: TextView
+    private lateinit var gamingStatsText: TextView
     private lateinit var gamingModeToggleBtn: Button
     private lateinit var aimAssistToggleBtn: Button
+
+    private var fpsCount = 0
+    private var lastFpsTime = 0L
+    private var currentFps = 0
+    private var currentPing = -1
+    private var batteryTemp = -1f
     private lateinit var statusDot: View
     private lateinit var statusLabel: TextView
     private lateinit var micButton: View
@@ -126,6 +133,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         gamingGameText = findViewById(R.id.gamingGameText)
         gamingOptimizationText = findViewById(R.id.gamingOptimizationText)
         aimAssistStatusText = findViewById(R.id.aimAssistStatusText)
+        gamingStatsText = findViewById(R.id.gamingStatsText)
         gamingModeToggleBtn = findViewById(R.id.gamingModeToggleBtn)
         aimAssistToggleBtn = findViewById(R.id.aimAssistToggleBtn)
         statusDot = findViewById(R.id.statusDot)
@@ -215,6 +223,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         setupPulseAnimation()
         lockUiUntilPinVerified()
         startSystemDataFetcher()
+        setupFpsCounter()
+        setupBatteryReceiver()
         JarvisSoundManager.playStartup()
 
         if (AirTouchSettings.isEnabled(this)) {
@@ -969,6 +979,37 @@ override fun onResume() {
     private var lastTotalCpu = 0L
     private var lastIdleCpu = 0L
 
+    private val batteryReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
+                val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
+                if (temp > 0) {
+                    batteryTemp = temp / 10f
+                }
+            }
+        }
+    }
+
+    private fun setupBatteryReceiver() {
+        val filter = android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        registerReceiver(batteryReceiver, filter)
+    }
+
+    private fun setupFpsCounter() {
+        android.view.Choreographer.getInstance().postFrameCallback(object : android.view.Choreographer.FrameCallback {
+            override fun doFrame(frameTimeNanos: Long) {
+                fpsCount++
+                val now = System.currentTimeMillis()
+                if (now - lastFpsTime >= 1000) {
+                    currentFps = fpsCount
+                    fpsCount = 0
+                    lastFpsTime = now
+                }
+                android.view.Choreographer.getInstance().postFrameCallback(this)
+            }
+        })
+    }
+
     private fun startSystemDataFetcher() {
         systemDataRunnable = object : Runnable {
             override fun run() {
@@ -1008,6 +1049,26 @@ override fun onResume() {
                     } catch (e: Exception) { }
 
                     try {
+                        val process = Runtime.getRuntime().exec("/system/bin/ping -c 1 -W 1 8.8.8.8")
+                        val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
+                        var line: String?
+                        var ping = -1
+                        while (reader.readLine().also { line = it } != null) {
+                            if (line?.contains("time=") == true) {
+                                val match = Regex("time=([0-9.]+) ms").find(line!!)
+                                if (match != null) {
+                                    ping = match.groupValues[1].toFloat().toInt()
+                                    break
+                                }
+                            }
+                        }
+                        process.waitFor()
+                        currentPing = ping
+                    } catch (e: Exception) {
+                        currentPing = -1
+                    }
+
+                    try {
                         val actManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                         val memInfo = ActivityManager.MemoryInfo()
                         actManager.getMemoryInfo(memInfo)
@@ -1033,6 +1094,10 @@ override fun onResume() {
                         gaugeBattery.progress = batLevel
                         gaugeRam.progress = ramUsage
                         gaugeStorage.progress = storageUsage
+
+                        val tempStr = if (batteryTemp > 0) "${batteryTemp}°C" else "--"
+                        val pingStr = if (currentPing >= 0) "${currentPing}ms" else "--"
+                        gamingStatsText.text = "FPS: $currentFps | PING: $pingStr | TEMP: $tempStr"
                     }
                 }.start()
 
@@ -1044,6 +1109,10 @@ override fun onResume() {
 
     override fun onDestroy() {
         systemDataHandler.removeCallbacks(systemDataRunnable)
+
+        try {
+            unregisterReceiver(batteryReceiver)
+        } catch (e: Exception) {}
 
         speechRecognizer.destroy()
         tts.stop()

@@ -769,6 +769,65 @@ class CommandExecutor(
                 }
             }
 
+            is Command.ShowGamingStats -> {
+                if (!gamingModeManager.isGamingModeOn) {
+                    onSpeak("Gaming mode off hai, pehle use chalu karo.")
+                } else {
+                    onSpeak("Gaming stats screen par update ho rahe hain sir.")
+                }
+            }
+
+            is Command.OptimizeGaming -> {
+                if (!gamingModeManager.isGamingModeOn) {
+                    gamingModeManager.enableGamingMode(onSpeak)
+                }
+
+                // Attempt to clean memory legitimately
+                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                val packages = context.packageManager.getInstalledPackages(0)
+                var killed = 0
+                for (pack in packages) {
+                    if (pack.packageName != context.packageName && pack.packageName != gamingModeManager.currentGame) {
+                        try {
+                            am.killBackgroundProcesses(pack.packageName)
+                            killed++
+                        } catch (e: Exception) {}
+                    }
+                }
+                onSpeak("Gaming optimizations applied. Cleared background tasks.")
+            }
+
+            is Command.ShowFreeFireProfile -> {
+                val stats = """
+                    General: ${gamingModeManager.ffGeneralSens}
+                    Red Dot: ${gamingModeManager.ffRedDotSens}
+                    2x Scope: ${gamingModeManager.ff2xScopeSens}
+                    4x Scope: ${gamingModeManager.ff4xScopeSens}
+                    Sniper: ${gamingModeManager.ffSniperScopeSens}
+                    Free Look: ${gamingModeManager.ffFreeLookSens}
+                """.trimIndent()
+                onSpeak("Yeh rahi aapki Free Fire sensitivity profile:\n$stats")
+            }
+
+            is Command.UpdateFreeFireProfile -> {
+                val target = command.setting.lowercase()
+                var updated = true
+                when {
+                    target.contains("general") -> gamingModeManager.ffGeneralSens = command.value
+                    target.contains("red dot") || target.contains("red") -> gamingModeManager.ffRedDotSens = command.value
+                    target.contains("2x") -> gamingModeManager.ff2xScopeSens = command.value
+                    target.contains("4x") -> gamingModeManager.ff4xScopeSens = command.value
+                    target.contains("sniper") -> gamingModeManager.ffSniperScopeSens = command.value
+                    target.contains("free look") || target.contains("look") -> gamingModeManager.ffFreeLookSens = command.value
+                    else -> updated = false
+                }
+                if (updated) {
+                    onSpeak("Maine $target sensitivity ${command.value} par set kar di hai.")
+                } else {
+                    onSpeak("Samajh nahi aaya kaunsi setting update karni hai. (Options: general, red dot, 2x, 4x, sniper, free look)")
+                }
+            }
+
             is Command.AimAssist -> {
                 if (command.enable) {
                     gamingModeManager.enableAimAssist(onSpeak)

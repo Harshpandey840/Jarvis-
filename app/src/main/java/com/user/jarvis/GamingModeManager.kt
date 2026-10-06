@@ -40,6 +40,31 @@ class GamingModeManager private constructor(private val context: Context) {
         get() = prefs.getBoolean("is_aim_assist_on", false)
         set(value) = prefs.edit().putBoolean("is_aim_assist_on", value).apply()
 
+    // Free Fire Profile Settings
+    var ffGeneralSens: Int
+        get() = prefs.getInt("ff_general_sens", 100)
+        set(value) = prefs.edit().putInt("ff_general_sens", value).apply()
+
+    var ffRedDotSens: Int
+        get() = prefs.getInt("ff_red_dot_sens", 90)
+        set(value) = prefs.edit().putInt("ff_red_dot_sens", value).apply()
+
+    var ff2xScopeSens: Int
+        get() = prefs.getInt("ff_2x_scope_sens", 85)
+        set(value) = prefs.edit().putInt("ff_2x_scope_sens", value).apply()
+
+    var ff4xScopeSens: Int
+        get() = prefs.getInt("ff_4x_scope_sens", 80)
+        set(value) = prefs.edit().putInt("ff_4x_scope_sens", value).apply()
+
+    var ffSniperScopeSens: Int
+        get() = prefs.getInt("ff_sniper_scope_sens", 50)
+        set(value) = prefs.edit().putInt("ff_sniper_scope_sens", value).apply()
+
+    var ffFreeLookSens: Int
+        get() = prefs.getInt("ff_free_look_sens", 70)
+        set(value) = prefs.edit().putInt("ff_free_look_sens", value).apply()
+
     var isAutoModeEnabled: Boolean
         get() = prefs.getBoolean("is_auto_gaming_mode", false)
         set(value) {
