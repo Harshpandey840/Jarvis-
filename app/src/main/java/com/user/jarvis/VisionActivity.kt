@@ -107,8 +107,6 @@ class VisionActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         if (status == TextToSpeech.SUCCESS) {
             tts?.language = Locale("hi", "IN")
             VoicePreferences.applySavedVoice(this, tts!!)
-            tts?.setPitch(0.78f)
-            tts?.setSpeechRate(0.98f)
         }
     }
 
