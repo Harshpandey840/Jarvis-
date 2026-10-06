@@ -23,6 +23,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import com.user.jarvis.R
 import android.os.PowerManager
 import android.provider.Settings
 import android.speech.RecognitionListener
@@ -628,59 +629,103 @@ override fun onResume() {
         jarvisToggleButton.isEnabled = false
         val securityPrefs = getSharedPreferences("jarvis_security", Context.MODE_PRIVATE)
         val savedPin = securityPrefs.getString("pin", null)
-        if (savedPin == null) promptSetPin(securityPrefs) else promptEnterPin(savedPin)
+        if (savedPin == null) promptSetPin(securityPrefs) else promptEnterPin(savedPin ?: "")
     }
 
-    private fun promptSetPin(prefs: SharedPreferences) {
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            hint = "4 se 6 digit PIN"
+    private fun promptSetPin(prefs: SharedPreferences) { showCustomPinDialog(prefs, null) }
+    private fun promptEnterPin(savedPin: String) { showCustomPinDialog(getSharedPreferences("jarvis_security", Context.MODE_PRIVATE), savedPin) }
+
+    private fun showCustomPinDialog(prefs: SharedPreferences, savedPin: String?) {
+        val isSettingPin = savedPin == null
+        val dialogView = layoutInflater.inflate(resources.getIdentifier("dialog_security_pin", "layout", packageName), null)
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        dialog.setContentView(dialogView)
+        dialog.setCancelable(false)
+
+        val titleText = dialogView.findViewById<TextView>(resources.getIdentifier("securityTitleText", "id", packageName))
+        val instructionText = dialogView.findViewById<TextView>(resources.getIdentifier("instructionText", "id", packageName))
+
+        if (isSettingPin) {
+            instructionText.text = "SET 4-DIGIT SECURITY PIN"
+        } else {
+            instructionText.text = "ENTER SECURITY PIN"
         }
-        AlertDialog.Builder(this)
-            .setTitle("Jarvis PIN set karo")
-            .setMessage("Ye PIN app kholte waqt maangega. Agar koi 3 baar galat PIN daale, uska photo khinch ke phone lock ho jayega.")
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton("Set karo") { _, _ ->
-                val pin = input.text.toString()
-                if (pin.length in 4..6) {
-                    prefs.edit().putString("pin", pin).apply()
-                    requestDeviceAdminIfNeeded()
-                    unlockUi()
-                } else {
-                    Toast.makeText(this, "4 se 6 digit ka PIN daalo", Toast.LENGTH_SHORT).show()
-                    promptSetPin(prefs)
-                }
+
+        val dots = listOf(
+            dialogView.findViewById<View>(resources.getIdentifier("dot1", "id", packageName)),
+            dialogView.findViewById<View>(resources.getIdentifier("dot2", "id", packageName)),
+            dialogView.findViewById<View>(resources.getIdentifier("dot3", "id", packageName)),
+            dialogView.findViewById<View>(resources.getIdentifier("dot4", "id", packageName))
+        )
+
+        var currentPin = ""
+
+        fun updateDots() {
+            for (i in 0 until 4) {
+                dots[i].background = ContextCompat.getDrawable(this@MainActivity, if (i < currentPin.length) R.drawable.circle_solid else R.drawable.pulse_ring)
+                dots[i].backgroundTintList = ColorStateList.valueOf(getColorCompat(if (i < currentPin.length) R.color.accent_primary else R.color.accent_primary_dim))
             }
-            .setNegativeButton("Skip") { _, _ -> unlockUi() }
-            .show()
-    }
-
-    private fun promptEnterPin(savedPin: String) {
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            hint = "PIN daalo"
         }
-        AlertDialog.Builder(this)
-            .setTitle("Jarvis Locked")
-            .setMessage("PIN daalke unlock karo")
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton("Unlock") { _, _ ->
-                if (input.text.toString() == savedPin) {
+
+        fun onPinComplete() {
+            if (isSettingPin) {
+                prefs.edit().putString("pin", currentPin).apply()
+                requestDeviceAdminIfNeeded()
+                dialog.dismiss()
+                unlockUi()
+            } else {
+                if (currentPin == savedPin) {
                     wrongPinAttempts = 0
-                    unlockUi()
+                    for (dot in dots) {
+                        dot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
+                    }
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        dialog.dismiss()
+                        unlockUi()
+                    }, 300)
                 } else {
                     wrongPinAttempts++
-                    Toast.makeText(this, "Galat PIN", Toast.LENGTH_SHORT).show()
+                    currentPin = ""
+                    updateDots()
+                    JarvisHudAnimator.shakeError(dialogView.findViewById(resources.getIdentifier("pinDotsContainer", "id", packageName)))
+                    for (dot in dots) {
+                        dot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.stop_red))
+                    }
                     if (wrongPinAttempts >= 3) {
+                        dialog.dismiss()
                         triggerSecurityLockdown()
                         wrongPinAttempts = 0
+                        promptEnterPin(savedPin ?: "")
                     }
-                    promptEnterPin(savedPin)
                 }
             }
-            .show()
+        }
+
+        val btnIds = listOf(resources.getIdentifier("btn0", "id", packageName), resources.getIdentifier("btn1", "id", packageName), resources.getIdentifier("btn2", "id", packageName), resources.getIdentifier("btn3", "id", packageName), resources.getIdentifier("btn4", "id", packageName), resources.getIdentifier("btn5", "id", packageName), resources.getIdentifier("btn6", "id", packageName), resources.getIdentifier("btn7", "id", packageName), resources.getIdentifier("btn8", "id", packageName), resources.getIdentifier("btn9", "id", packageName))
+        for (i in 0..9) {
+            dialogView.findViewById<Button>(btnIds[i]).setOnClickListener {
+                if (currentPin.length < 4) {
+                    currentPin += i.toString()
+                    updateDots()
+                    JarvisSoundManager.playClick()
+                    if (currentPin.length == 4) {
+                        onPinComplete()
+                    }
+                }
+            }
+        }
+
+        // Add ImageButton import workaround without crashing build
+        val delBtn = dialogView.findViewById<View>(resources.getIdentifier("btnDel", "id", packageName))
+        delBtn.setOnClickListener {
+            if (currentPin.isNotEmpty()) {
+                currentPin = currentPin.dropLast(1)
+                updateDots()
+                JarvisSoundManager.playClick()
+            }
+        }
+
+        dialog.show()
     }
 
     private fun unlockUi() {
@@ -757,14 +802,14 @@ override fun onResume() {
                     Handler(Looper.getMainLooper()).post {
                         if (particleOrb.currentState == JarvisCoreView.State.SPEAKING) {
                             particleOrb.currentState = JarvisCoreView.State.IDLE
-                            stateLabel.text = "SYSTEM IDLE"
+                            runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "SYSTEM ONLINE") }
                         }
                     }
                 }
                 override fun onError(utteranceId: String?) {
                     Handler(Looper.getMainLooper()).post {
                         particleOrb.currentState = JarvisCoreView.State.IDLE
-                        stateLabel.text = "SYSTEM IDLE"
+                        runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "SYSTEM ONLINE") }
                     }
                 }
             })
@@ -782,7 +827,7 @@ override fun onResume() {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
         }
-        stateLabel.text = "LISTENING"
+        runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "JARVIS LISTENING") }
         particleOrb.currentState = JarvisCoreView.State.LISTENING
         JarvisSoundManager.playListening()
         speechRecognizer.startListening(intent)
@@ -794,17 +839,17 @@ override fun onResume() {
             val spokenText = matches?.firstOrNull().orEmpty()
             if (spokenText.isNotBlank()) {
                 addChatMessage(spokenText, true)
-                stateLabel.text = "PROCESSING"
+                runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "JARVIS PROCESSING") }
                 particleOrb.currentState = JarvisCoreView.State.PROCESSING
                 JarvisSoundManager.playProcessing()
                 commandExecutor.execute(spokenText)
             } else {
-                stateLabel.text = "SYSTEM IDLE"
+                runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "SYSTEM ONLINE") }
                 particleOrb.currentState = JarvisCoreView.State.IDLE
             }
         }
         override fun onError(error: Int) {
-            stateLabel.text = "ERROR / IDLE"
+            runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "SYSTEM ERROR") }
             particleOrb.currentState = JarvisCoreView.State.IDLE
             JarvisSoundManager.playError()
         }
@@ -874,7 +919,7 @@ override fun onResume() {
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
         addChatMessage(cleanText, false)
-        stateLabel.text = "SPEAKING"
+        runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "JARVIS SPEAKING") }
         particleOrb.currentState = JarvisCoreView.State.SPEAKING
         JarvisSoundManager.playSpeaking()
         tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "jarvis_speak")

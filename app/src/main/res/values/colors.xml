@@ -1,27 +1,30 @@
 <resources>
     <!-- New Obsidian Dark Theme Colors -->
-    <color name="bg_obsidian">#09090F</color>
-    <color name="surface_card">#15151D</color>
-    <color name="chat_bubble">#191922</color>
+    <color name="bg_obsidian">#040406</color> <!-- Even darker for better contrast -->
+    <color name="surface_card">#0B0B11</color>
+    <color name="chat_bubble">#101018</color>
 
-    <!-- Accent Colors -->
-    <color name="accent_primary">#A5A5FF</color>
-    <color name="accent_secondary">#7765F5</color>
-    <color name="accent_primary_dim">#5E5EA6</color>
-    <color name="accent_glow">#40A5A5FF</color>
+    <!-- Accent Colors (Cyan/Teal focused) -->
+    <color name="accent_primary">#00FFFF</color>
+    <color name="accent_secondary">#00BFFF</color>
+    <color name="accent_primary_dim">#005555</color>
+    <color name="accent_glow">#4000FFFF</color>
+    <color name="accent_purple_glow">#208800FF</color> <!-- Subtle secondary glow -->
 
     <!-- Text Colors -->
     <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#A0A0AA</color>
+    <color name="text_secondary">#88AABB</color>
+    <color name="text_highlight">#00FFFF</color>
 
     <!-- Status / Action Colors -->
-    <color name="accent_online_green">#00E676</color>
-    <color name="accent_offline_gray">#5A6672</color>
-    <color name="stop_red">#FF5252</color>
+    <color name="accent_online_green">#00FF88</color>
+    <color name="accent_offline_gray">#334455</color>
+    <color name="stop_red">#FF3333</color>
+    <color name="warning_orange">#FF8800</color>
 
     <!-- Old variables to keep compatibility -->
-    <color name="bg_dark">#09090F</color>
-    <color name="bg_dark_alt">#15151D</color>
-    <color name="accent_cyan">#A5A5FF</color>
-    <color name="accent_cyan_dim">#5E5EA6</color>
+    <color name="bg_dark">#040406</color>
+    <color name="bg_dark_alt">#0B0B11</color>
+    <color name="accent_cyan">#00FFFF</color>
+    <color name="accent_cyan_dim">#005555</color>
 </resources>
