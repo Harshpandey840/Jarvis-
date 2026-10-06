@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#040406">
+
+    <TextView
+        android:id="@+id/securityTitleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SECURITY"
+        android:textColor="#00E5FF"
+        android:textSize="24sp"
+        android:fontFamily="sans-serif-condensed"
+        android:letterSpacing="0.2"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="64dp" />
+
+    <TextView
+        android:id="@+id/instructionText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ENTER SECURITY PIN"
+        android:textColor="#8A939E"
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-condensed"
+        android:letterSpacing="0.1"
+        app:layout_constraintTop_toBottomOf="@id/securityTitleText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp" />
+
+    <LinearLayout
+        android:id="@+id/pinDotsContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/instructionText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="32dp">
+
+        <View android:id="@+id/dot1" android:layout_width="16dp" android:layout_height="16dp" android:layout_margin="8dp" />
+        <View android:id="@+id/dot2" android:layout_width="16dp" android:layout_height="16dp" android:layout_margin="8dp" />
+        <View android:id="@+id/dot3" android:layout_width="16dp" android:layout_height="16dp" android:layout_margin="8dp" />
+        <View android:id="@+id/dot4" android:layout_width="16dp" android:layout_height="16dp" android:layout_margin="8dp" />
+    </LinearLayout>
+
+    <GridLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:columnCount="3"
+        android:rowCount="4"
+        app:layout_constraintTop_toBottomOf="@id/pinDotsContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="48dp">
+
+        <Button android:id="@+id/btn1" android:text="1" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn2" android:text="2" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn3" android:text="3" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn4" android:text="4" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn5" android:text="5" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn6" android:text="6" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn7" android:text="7" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn8" android:text="8" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <Button android:id="@+id/btn9" android:text="9" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <View android:layout_width="0dp" android:layout_height="0dp"/>
+        <Button android:id="@+id/btn0" android:text="0" style="?android:attr/borderlessButtonStyle" android:textColor="#FFF" android:textSize="24sp" android:layout_margin="8dp"/>
+        <ImageButton android:id="@+id/btnDel" android:src="@android:drawable/ic_input_delete" android:background="?android:selectableItemBackground" android:layout_margin="8dp"/>
+    </GridLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
