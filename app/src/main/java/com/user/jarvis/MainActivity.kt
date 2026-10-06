@@ -750,8 +750,6 @@ override fun onResume() {
                 tts.setLanguage(Locale("en", "IN"))
             }
             VoicePreferences.applySavedVoice(this, tts)
-            tts.setPitch(0.78f)
-            tts.setSpeechRate(0.98f)
 
             tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}

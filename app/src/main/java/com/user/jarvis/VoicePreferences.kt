@@ -8,6 +8,12 @@ object VoicePreferences {
 
     private const val PREFS_NAME = "jarvis_voice_prefs"
     private const val KEY_VOICE_NAME = "voice_name"
+    private const val KEY_PITCH = "voice_pitch"
+    private const val KEY_SPEECH_RATE = "voice_speech_rate"
+
+    // Deep, powerful, authoritative AI settings
+    const val DEFAULT_PITCH = 0.65f
+    const val DEFAULT_SPEECH_RATE = 0.90f
 
     fun getCandidateVoices(tts: TextToSpeech): List<Voice> {
         val voices = tts.voices ?: return emptyList()
@@ -40,12 +46,60 @@ object VoicePreferences {
             .getString(KEY_VOICE_NAME, null)
     }
 
+    fun savePitch(context: Context, pitch: Float) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putFloat(KEY_PITCH, pitch).apply()
+    }
+
+    fun getPitch(context: Context): Float {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(KEY_PITCH, DEFAULT_PITCH)
+    }
+
+    fun saveSpeechRate(context: Context, speechRate: Float) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putFloat(KEY_SPEECH_RATE, speechRate).apply()
+    }
+
+    fun getSpeechRate(context: Context): Float {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(KEY_SPEECH_RATE, DEFAULT_SPEECH_RATE)
+    }
+
     fun applySavedVoice(context: Context, tts: TextToSpeech) {
-        val savedName = getSavedVoiceName(context) ?: return
+        tts.setPitch(getPitch(context))
+        tts.setSpeechRate(getSpeechRate(context))
+
         val voices = tts.voices ?: return
-        val match = voices.firstOrNull { it.name == savedName }
-        if (match != null) {
-            tts.voice = match
+        val savedName = getSavedVoiceName(context)
+
+        if (savedName != null) {
+            val match = voices.firstOrNull { it.name == savedName }
+            if (match != null) {
+                tts.voice = match
+                return
+            }
+        }
+
+        // If no saved voice, try to find a deep male voice.
+        // Lower frequencies often have "male", "low" or specific network-less configurations
+        val candidates = getCandidateVoices(tts)
+        val deepMaleVoice = candidates.firstOrNull { voice ->
+            val nameLower = voice.name.lowercase()
+            val features = voice.features?.joinToString(",")?.lowercase() ?: ""
+            // In Android's local voices, e.g. hi-in-x-hie-local, we can't be sure, but we can look for specific names
+            // Google TTS often has network/local variants. We prefer local for speed and offline.
+            (nameLower.contains("male") || features.contains("male") || nameLower.contains("-local-"))
+        } ?: candidates.firstOrNull { it.name.lowercase().contains("hi-in-x-hie-local") } // Example fallback
+
+        if (deepMaleVoice != null) {
+            tts.voice = deepMaleVoice
+            saveVoiceName(context, deepMaleVoice.name)
+        } else if (candidates.isNotEmpty()) {
+            // Fallback to finding something with en_IN or hi_IN
+            val fallbackVoice = candidates.firstOrNull { it.locale.toString().contains("hi") } ?: candidates.first()
+            tts.voice = fallbackVoice
+            saveVoiceName(context, fallbackVoice.name)
         }
     }
 }
