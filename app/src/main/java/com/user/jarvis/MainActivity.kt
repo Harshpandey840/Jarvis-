@@ -1,4 +1,11 @@
 package com.user.jarvis
+import android.os.Handler
+import android.os.Looper
+import android.os.BatteryManager
+import android.app.ActivityManager
+import android.os.StatFs
+import android.os.Environment
+
 
 import android.Manifest
 import android.animation.AnimatorSet
@@ -69,7 +76,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var fileSummaryButton: View
     private lateinit var securityModeButton: View
     private lateinit var jarvisToggleButton: Button
-    private lateinit var particleOrb: ParticleSphereView
+    private lateinit var particleOrb: JarvisCoreView
+    private lateinit var gaugeCpu: GaugeView
+    private lateinit var gaugeRam: GaugeView
+    private lateinit var gaugeBattery: GaugeView
+    private lateinit var gaugeStorage: GaugeView
+    private lateinit var waveformView: WaveformView
+    private val systemDataHandler = Handler(Looper.getMainLooper())
+    private lateinit var systemDataRunnable: Runnable
     private lateinit var micGlow: View
 
     private lateinit var commandExecutor: CommandExecutor
@@ -122,6 +136,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         securityModeButton = findViewById(R.id.securityModeButton)
         jarvisToggleButton = findViewById(R.id.jarvisToggleButton)
         particleOrb = findViewById(R.id.particleOrb)
+        gaugeCpu = findViewById<GaugeView>(R.id.gaugeCpu)
+        gaugeRam = findViewById<GaugeView>(R.id.gaugeRam)
+        gaugeBattery = findViewById<GaugeView>(R.id.gaugeBattery)
+        gaugeStorage = findViewById<GaugeView>(R.id.gaugeStorage)
+        waveformView = findViewById<WaveformView>(R.id.waveformView)
+        gaugeCpu.label = "CPU"
+        gaugeRam.label = "RAM"
+        gaugeBattery.label = "PWR"
+        gaugeStorage.label = "STRG"
         micGlow = findViewById(R.id.micGlow)
 
         systemSettingsStatusText = findViewById(R.id.systemSettingsStatusText)
@@ -190,6 +213,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         setupPulseAnimation()
         lockUiUntilPinVerified()
+        startSystemDataFetcher()
+        JarvisSoundManager.playStartup()
 
         if (AirTouchSettings.isEnabled(this)) {
             AirTouchForegroundService.start(this)
@@ -588,8 +613,13 @@ override fun onResume() {
     // ---------- Orb pulse animation ----------
 
     private fun setupPulseAnimation() {
-        // Pulse animation is now handled internally by ParticleSphereView
-        // through its continuous 3D rotation, and dynamic RMS scaling in onRmsChanged.
+        val glowAnimator = ObjectAnimator.ofFloat(micGlow, "alpha", 0.3f, 1.0f).apply {
+            duration = 1500
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = LinearInterpolator()
+        }
+        glowAnimator.start()
     }
     // ---------- PIN lock + intruder security ----------
 
@@ -722,6 +752,24 @@ override fun onResume() {
             VoicePreferences.applySavedVoice(this, tts)
             tts.setPitch(0.78f)
             tts.setSpeechRate(0.98f)
+
+            tts.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) {
+                    Handler(Looper.getMainLooper()).post {
+                        if (particleOrb.currentState == JarvisCoreView.State.SPEAKING) {
+                            particleOrb.currentState = JarvisCoreView.State.IDLE
+                            stateLabel.text = "SYSTEM IDLE"
+                        }
+                    }
+                }
+                override fun onError(utteranceId: String?) {
+                    Handler(Looper.getMainLooper()).post {
+                        particleOrb.currentState = JarvisCoreView.State.IDLE
+                        stateLabel.text = "SYSTEM IDLE"
+                    }
+                }
+            })
         }
     }
 
@@ -736,7 +784,9 @@ override fun onResume() {
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 700L)
         }
-        stateLabel.text = "Listening..."
+        stateLabel.text = "LISTENING"
+        particleOrb.currentState = JarvisCoreView.State.LISTENING
+        JarvisSoundManager.playListening()
         speechRecognizer.startListening(intent)
     }
 
@@ -746,13 +796,20 @@ override fun onResume() {
             val spokenText = matches?.firstOrNull().orEmpty()
             if (spokenText.isNotBlank()) {
                 addChatMessage(spokenText, true)
-                stateLabel.text = "Thinking..."
+                stateLabel.text = "PROCESSING"
+                particleOrb.currentState = JarvisCoreView.State.PROCESSING
+                JarvisSoundManager.playProcessing()
                 commandExecutor.execute(spokenText)
             } else {
-                stateLabel.text = "Just Say It."
+                stateLabel.text = "SYSTEM IDLE"
+                particleOrb.currentState = JarvisCoreView.State.IDLE
             }
         }
-        override fun onError(error: Int) { stateLabel.text = "Just Say It." }
+        override fun onError(error: Int) {
+            stateLabel.text = "ERROR / IDLE"
+            particleOrb.currentState = JarvisCoreView.State.IDLE
+            JarvisSoundManager.playError()
+        }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {
@@ -762,7 +819,9 @@ override fun onResume() {
                 .scaleY(scale)
                 .setDuration(50)
                 .start()
-            particleOrb.pulseScale = 1f + (rmsdB / 10f).coerceIn(0f, 1f) * 0.2f
+            val intensity = (rmsdB / 10f).coerceIn(0f, 1f)
+            particleOrb.externalPulse = 1f + intensity * 0.2f
+            waveformView.rms = rmsdB
         }
         override fun onBufferReceived(buffer: ByteArray?) {}
         override fun onEndOfSpeech() {}
@@ -817,9 +876,10 @@ override fun onResume() {
     private fun speak(text: String) {
         val cleanText = text.replace(Regex("\\*\\*(.*?)\\*\\*"), "$1")
         addChatMessage(cleanText, false)
-        stateLabel.text = "Jarvis is speaking"
-        SciFiTone.play()
-        tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
+        stateLabel.text = "SPEAKING"
+        particleOrb.currentState = JarvisCoreView.State.SPEAKING
+        JarvisSoundManager.playSpeaking()
+        tts.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, "jarvis_speak")
 
         if (cleanText.contains("API key khaali hai", ignoreCase = true)) {
             checkAndPromptGroqApiKey()
@@ -862,7 +922,86 @@ override fun onResume() {
         } catch (e: Exception) {}
     }
 
+
+    private var lastTotalCpu = 0L
+    private var lastIdleCpu = 0L
+
+    private fun startSystemDataFetcher() {
+        systemDataRunnable = object : Runnable {
+            override fun run() {
+                Thread {
+                    var cpuUsage = -1f
+                    try {
+                        val reader = java.io.RandomAccessFile("/proc/stat", "r")
+                        val load = reader.readLine()
+                        if (load != null) {
+                            val toks = load.split(Regex("\\s+"))
+                            val idle = toks[4].toLong()
+                            val total = toks[1].toLong() + toks[2].toLong() + toks[3].toLong() +
+                                    toks[4].toLong() + toks[5].toLong() + toks[6].toLong() + toks[7].toLong() + toks[8].toLong()
+
+                            val diffTotal = total - lastTotalCpu
+                            val diffIdle = idle - lastIdleCpu
+
+                            if (lastTotalCpu != 0L && diffTotal > 0) {
+                                cpuUsage = (diffTotal - diffIdle).toFloat() / diffTotal.toFloat()
+                            }
+
+                            lastTotalCpu = total
+                            lastIdleCpu = idle
+                        }
+                        reader.close()
+                    } catch (e: Exception) {
+                        cpuUsage = -1f
+                    }
+
+                    var batLevel = 0f
+                    var ramUsage = 0f
+                    var storageUsage = 0f
+
+                    try {
+                        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                        batLevel = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) / 100f
+                    } catch (e: Exception) { }
+
+                    try {
+                        val actManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                        val memInfo = ActivityManager.MemoryInfo()
+                        actManager.getMemoryInfo(memInfo)
+                        ramUsage = (memInfo.totalMem - memInfo.availMem).toFloat() / memInfo.totalMem.toFloat()
+                    } catch (e: Exception) { }
+
+                    try {
+                        val stat = StatFs(Environment.getExternalStorageDirectory().path)
+                        val totalBytes = stat.totalBytes
+                        val availableBytes = stat.availableBytes
+                        val usedBytes = totalBytes - availableBytes
+                        storageUsage = if (totalBytes > 0) usedBytes.toFloat() / totalBytes.toFloat() else 0f
+                    } catch (e: Exception) { }
+
+                    systemDataHandler.post {
+                        if (cpuUsage >= 0f) {
+                            gaugeCpu.progress = cpuUsage
+                            gaugeCpu.label = "CPU"
+                        } else {
+                            gaugeCpu.progress = 0f
+                            gaugeCpu.label = "CPU --"
+                        }
+                        gaugeBattery.progress = batLevel
+                        gaugeRam.progress = ramUsage
+                        gaugeStorage.progress = storageUsage
+                    }
+                }.start()
+
+                systemDataHandler.postDelayed(this, 3000)
+            }
+        }
+        systemDataHandler.post(systemDataRunnable)
+    }
+
     override fun onDestroy() {
+        systemDataHandler.removeCallbacks(systemDataRunnable)
+
         speechRecognizer.destroy()
         tts.stop()
         tts.shutdown()
