@@ -893,6 +893,7 @@ override fun onResume() {
                 action = JarvisListenerService.ACTION_STOP
             }
             startService(stopIntent)
+            getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE).edit().putBoolean("is_running", false).apply()
             isJarvisRunning = false
             jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_play, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_offline_gray))
@@ -902,6 +903,7 @@ override fun onResume() {
             requestOverlayPermission()
             val startIntent = Intent(this, JarvisListenerService::class.java)
             ContextCompat.startForegroundService(this, startIntent)
+            getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE).edit().putBoolean("is_running", true).apply()
             isJarvisRunning = true
             jarvisToggleButton.setCompoundDrawablesWithIntrinsicBounds(0, android.R.drawable.ic_media_pause, 0, 0)
             statusDot.backgroundTintList = ColorStateList.valueOf(getColorCompat(R.color.accent_online_green))
