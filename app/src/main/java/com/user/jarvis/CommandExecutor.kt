@@ -36,6 +36,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import android.app.KeyguardManager
 
 class CommandExecutor(
     private val context: Context,
@@ -58,6 +59,12 @@ class CommandExecutor(
         .build()
 
     private val gamingModeManager = GamingModeManager.getInstance(context)
+
+    private fun isDeviceLocked(): Boolean {
+        val keyguardManager = context.getSystemService(android.content.Context.KEYGUARD_SERVICE) as? KeyguardManager
+        return keyguardManager?.isKeyguardLocked == true
+    }
+
 
     fun execute(spokenText: String) {
         val localCommand = VoiceCommandProcessor.parse(spokenText)
@@ -164,6 +171,11 @@ class CommandExecutor(
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
 
+                if (isDeviceLocked()) {
+                    onSpeak("Device lock hai. Call karne ke liye unlock karein.")
+                    onFinished()
+                    return
+                }
                 context.startActivity(callIntent)
 
                 onSpeak("${command.contactName} ko call kar raha hoon")
