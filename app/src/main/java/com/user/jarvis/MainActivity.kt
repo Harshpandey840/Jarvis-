@@ -23,6 +23,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.app.role.RoleManager
+import androidx.activity.result.contract.ActivityResultContracts
 import com.user.jarvis.R
 import android.os.PowerManager
 import android.provider.Settings
@@ -99,6 +101,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var systemSettingsStatusText: TextView
     private lateinit var systemSettingsEnableBtn: Button
+    private lateinit var assistantRoleStatusText: TextView
+    private lateinit var assistantRoleEnableBtn: Button
     private lateinit var systemSettingsManager: SystemSettingsManager
     private var wrongPinAttempts = 0
 
@@ -119,6 +123,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val fileSummaryLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) handleFileForSummary(uri) }
+
+    private val roleRequestLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            Toast.makeText(this, "Jarvis is now the default assistant", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Failed to set default assistant", Toast.LENGTH_SHORT).show()
+        }
+        updateAssistantRoleStatus()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -158,12 +171,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         systemSettingsStatusText = findViewById(R.id.systemSettingsStatusText)
         systemSettingsEnableBtn = findViewById(R.id.systemSettingsEnableBtn)
+        assistantRoleStatusText = findViewById(R.id.assistantRoleStatusText)
+        assistantRoleEnableBtn = findViewById(R.id.assistantRoleEnableBtn)
 
         systemSettingsManager = SystemSettingsManager(this)
 
         systemSettingsEnableBtn.setOnClickListener {
             systemSettingsManager.requestWriteSettingsPermission()
         }
+        assistantRoleEnableBtn.setOnClickListener { requestAssistantRole() }
 
         youSaidText.visibility = View.INVISIBLE
         jarvisReplyText.visibility = View.INVISIBLE
@@ -361,6 +377,47 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         gamingModeToggleBtn.text = if (manager.isGamingModeOn) "Stop Gaming" else "Start Gaming"
         aimAssistToggleBtn.text = if (manager.isAimAssistOn) "Crosshair: OFF" else "Crosshair: ON"
+    }
+
+    private fun updateAssistantRoleStatus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(Context.ROLE_SERVICE) as RoleManager
+            val isRoleAvailable = roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)
+            if (isRoleAvailable) {
+                val isRoleHeld = roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)
+                if (isRoleHeld) {
+                    assistantRoleStatusText.text = "ASSISTANT: DEFAULT"
+                    assistantRoleStatusText.setTextColor(getColorCompat(R.color.accent_online_green))
+                    assistantRoleEnableBtn.visibility = View.GONE
+                } else {
+                    assistantRoleStatusText.text = "ASSISTANT: NOT DEFAULT"
+                    assistantRoleStatusText.setTextColor(getColorCompat(R.color.stop_red))
+                    assistantRoleEnableBtn.visibility = View.VISIBLE
+                }
+            } else {
+                assistantRoleStatusText.text = "ASSISTANT: UNAVAILABLE"
+                assistantRoleStatusText.setTextColor(getColorCompat(R.color.stop_red))
+                assistantRoleEnableBtn.visibility = View.GONE
+            }
+        } else {
+            assistantRoleStatusText.text = "ASSISTANT: NOT SUPPORTED"
+            assistantRoleStatusText.setTextColor(getColorCompat(R.color.stop_red))
+            assistantRoleEnableBtn.visibility = View.GONE
+        }
+    }
+
+    private fun requestAssistantRole() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(Context.ROLE_SERVICE) as RoleManager
+            if (roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) {
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
+                roleRequestLauncher.launch(intent)
+            } else {
+                Toast.makeText(this, "Assistant Role is not available on this device", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Assistant Role requires Android 10 (Q) or higher", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun updateSystemSettingsUI() {

@@ -221,12 +221,43 @@
             android:textColor="@color/accent_primary" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/assistantRoleStatusContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/systemSettingsStatusContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/assistantRoleStatusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ASSISTANT: NOT DEFAULT"
+            android:textColor="@color/stop_red"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-condensed"
+            android:paddingEnd="16dp" />
+
+        <Button
+            android:id="@+id/assistantRoleEnableBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:text="SET DEFAULT"
+            android:textSize="8sp"
+            android:background="@drawable/bg_circle_button"
+            android:textColor="@color/accent_primary" />
+    </LinearLayout>
+
     <!-- CHAT UI -->
     <ScrollView
         android:id="@+id/chatScrollView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/systemSettingsStatusContainer"
+        app:layout_constraintTop_toBottomOf="@id/assistantRoleStatusContainer"
         app:layout_constraintBottom_toTopOf="@id/bottomControlsContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

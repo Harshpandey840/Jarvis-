@@ -794,19 +794,10 @@ class CommandExecutor(
                     gamingModeManager.enableGamingMode(onSpeak)
                 }
 
-                // Attempt to clean memory legitimately
-                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                val packages = context.packageManager.getInstalledPackages(0)
-                var killed = 0
-                for (pack in packages) {
-                    if (pack.packageName != context.packageName && pack.packageName != gamingModeManager.currentGame) {
-                        try {
-                            am.killBackgroundProcesses(pack.packageName)
-                            killed++
-                        } catch (e: Exception) {}
-                    }
-                }
-                onSpeak("Gaming optimizations applied. Cleared background tasks.")
+                // Removing direct killBackgroundProcesses usage to adhere to Android's strict background execution policies
+                // and to prevent requiring unnecessary privileged permissions like KILL_BACKGROUND_PROCESSES.
+                // We notify the user that gaming mode is enabled without making false claims about killing apps.
+                onSpeak("Gaming mode enabled. Background optimizations active.")
             }
 
             is Command.ShowFreeFireProfile -> {
