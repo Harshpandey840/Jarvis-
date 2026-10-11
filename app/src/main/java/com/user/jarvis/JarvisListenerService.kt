@@ -182,6 +182,9 @@ class JarvisListenerService : Service() {
             return START_NOT_STICKY
         }
 
+        if (intent?.action == "com.user.jarvis.ACTION_START_ASSISTANT_COMMAND") {
+            onWakeWordDetected()
+        }
         return START_STICKY
     }
 
@@ -472,6 +475,7 @@ class JarvisListenerService : Service() {
                     }
 
                     audioRecord.startRecording()
+                    android.util.Log.d(TAG, "Microphone became available and started recording")
 
                     val shortBuffer = ShortArray(1280)
                     val floatBuffer = FloatArray(1280)
@@ -510,6 +514,7 @@ class JarvisListenerService : Service() {
 
                             val chunk = if (readResult == floatBuffer.size) floatBuffer else floatBuffer.copyOf(readResult)
                             wakeWordEngine?.processAudioChunk(chunk)
+
                         }
                     }
                 } catch (e: InterruptedException) {
@@ -561,6 +566,7 @@ class JarvisListenerService : Service() {
 
 
     private fun onWakeWordDetected() {
+        android.util.Log.d(TAG, "Wake word 'Hey Jarvis' detected!")
 
         if (!serviceActive) return
         if (waitingForCommand) return
@@ -578,6 +584,13 @@ class JarvisListenerService : Service() {
         )
 
         startCommandTimeout()
+
+        // Show assistant session which brings up the HUD
+        try {
+            com.user.jarvis.assistant.JarvisVoiceInteractionService.instance?.showAssistantSession()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to show assistant session", e)
+        }
 
         speak("Ji, bolo.")
     }
