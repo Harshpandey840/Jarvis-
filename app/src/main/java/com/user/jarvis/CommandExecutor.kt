@@ -41,13 +41,19 @@ import android.app.KeyguardManager
 class CommandExecutor(
     private val context: Context,
     private val onSpeak: (String) -> Unit,
-    private val onFinished: () -> Unit = {},
+    private val onFinished: (Boolean) -> Unit = {},
     private val onShowView: ((android.view.View) -> Unit)? = null
 ) {
 
     private val appLauncher = AppLauncher(context)
 
     private val contactResolver = ContactResolver(context)
+
+    private fun speakAndFinish(msg: String) {
+        speakAndFinish(msg)
+        onFinished(false)
+    }
+
 
     private val messageSender = MessageSender(context)
 
@@ -89,16 +95,16 @@ class CommandExecutor(
                 val opened = appLauncher.openApp(command.appName)
 
                 if (opened) {
-                    onFinished()
+                    onFinished(true)
                 } else {
-                    onSpeak("${command.appName} nahi mila")
+                    speakAndFinish("${command.appName} nahi mila")
                 }
             }
 
             is Command.SendMessage -> {
 
                 if (!hasPermission(Manifest.permission.READ_CONTACTS)) {
-                    onSpeak("Permission nahi hai message bhejne ki")
+                    speakAndFinish("Permission nahi hai message bhejne ki")
                     return
                 }
 
@@ -106,7 +112,7 @@ class CommandExecutor(
                     contactResolver.findNumber(command.contactName)
 
                 if (number == null) {
-                    onSpeak("${command.contactName} contact nahi mila")
+                    speakAndFinish("${command.contactName} contact nahi mila")
                     return
                 }
 
@@ -121,7 +127,7 @@ class CommandExecutor(
                             arrayOf(Manifest.permission.SEND_SMS),
                             101
                         )
-                        onSpeak("SMS permission allow karo aur phir se bolo")
+                        speakAndFinish("SMS permission allow karo aur phir se bolo")
                         return
                     } else {
                         fallbackToManualSms(number, command.text)
@@ -137,9 +143,9 @@ class CommandExecutor(
                         )
 
                     if (sent) {
-                        onSpeak("${command.contactName} ko message bhej diya")
+                        speakAndFinish("${command.contactName} ko message bhej diya")
                     } else {
-                        onSpeak("Message nahi bhej paya")
+                        speakAndFinish("Message nahi bhej paya")
                     }
                 } catch (se: SecurityException) {
                     fallbackToManualSms(number, command.text)
@@ -151,7 +157,7 @@ class CommandExecutor(
                 if (!hasPermission(Manifest.permission.CALL_PHONE) ||
                     !hasPermission(Manifest.permission.READ_CONTACTS)
                 ) {
-                    onSpeak("Permission nahi hai call karne ki")
+                    speakAndFinish("Permission nahi hai call karne ki")
                     return
                 }
 
@@ -159,7 +165,7 @@ class CommandExecutor(
                     contactResolver.findNumber(command.contactName)
 
                 if (number == null) {
-                    onSpeak("${command.contactName} contact nahi mila")
+                    speakAndFinish("${command.contactName} contact nahi mila")
                     return
                 }
 
@@ -172,19 +178,19 @@ class CommandExecutor(
                     }
 
                 if (isDeviceLocked()) {
-                    onSpeak("Device lock hai. Call karne ke liye unlock karein.")
-                    onFinished()
+                    speakAndFinish("Device lock hai. Call karne ke liye unlock karein.")
+                    onFinished(true)
                     return
                 }
                 context.startActivity(callIntent)
 
-                onSpeak("${command.contactName} ko call kar raha hoon")
+                speakAndFinish("${command.contactName} ko call kar raha hoon")
             }
 
             is Command.SendWhatsApp -> {
 
                 if (!hasPermission(Manifest.permission.READ_CONTACTS)) {
-                    onSpeak("Permission nahi hai contacts dekhne ki")
+                    speakAndFinish("Permission nahi hai contacts dekhne ki")
                     return
                 }
 
@@ -192,7 +198,7 @@ class CommandExecutor(
                     contactResolver.findNumber(command.contactName)
 
                 if (number == null) {
-                    onSpeak("${command.contactName} contact nahi mila")
+                    speakAndFinish("${command.contactName} contact nahi mila")
                     return
                 }
 
@@ -218,12 +224,12 @@ class CommandExecutor(
 
                     context.startActivity(intent)
 
-                    onSpeak(
+                    speakAndFinish(
                         "${command.contactName} ke WhatsApp mein message tayyar hai, Send dabana"
                     )
 
                 } catch (_: Exception) {
-                    onSpeak("WhatsApp nahi khul paya")
+                    speakAndFinish("WhatsApp nahi khul paya")
                 }
             }
 
@@ -244,7 +250,7 @@ class CommandExecutor(
 
                 context.startActivity(intent)
 
-                onSpeak(
+                speakAndFinish(
                     "${command.query} search kar raha hoon"
                 )
             }
@@ -266,7 +272,7 @@ class CommandExecutor(
 
                 context.startActivity(intent)
 
-                onSpeak(
+                speakAndFinish(
                     "${command.query} bajane ja raha hoon"
                 )
             }
@@ -296,15 +302,15 @@ class CommandExecutor(
                     context.startActivity(intent)
 
                     if (command.hour in 0..23) {
-                        onSpeak("Alarm laga raha hoon")
+                        speakAndFinish("Alarm laga raha hoon")
                     } else {
-                        onSpeak(
+                        speakAndFinish(
                             "Alarm app khol raha hoon, time set kar lena"
                         )
                     }
 
                 } catch (_: Exception) {
-                    onSpeak("Alarm nahi laga paya")
+                    speakAndFinish("Alarm nahi laga paya")
                 }
             }
 
@@ -356,11 +362,11 @@ class CommandExecutor(
                     ).format(calendar.time)
 
                 if (command.isRecurring) {
-                    onSpeak(
+                    speakAndFinish(
                         "Theek hai, har roz $timeStr ke time yaad dilaunga"
                     )
                 } else {
-                    onSpeak(
+                    speakAndFinish(
                         "Theek hai, $timeStr ko yaad dila dunga"
                     )
                 }
@@ -381,7 +387,7 @@ class CommandExecutor(
                     .putStringSet("notes", existing)
                     .apply()
 
-                onSpeak("Note save kar diya")
+                speakAndFinish("Note save kar diya")
             }
 
             is Command.AddTodo -> {
@@ -399,7 +405,7 @@ class CommandExecutor(
                     .putStringSet("todos", existing)
                     .apply()
 
-                onSpeak("Todo list mein add kar diya")
+                speakAndFinish("Todo list mein add kar diya")
             }
 
             Command.ReadTodos -> {
@@ -412,9 +418,9 @@ class CommandExecutor(
                         ?: emptyList()
 
                 if (todos.isEmpty()) {
-                    onSpeak("Todo list khaali hai")
+                    speakAndFinish("Todo list khaali hai")
                 } else {
-                    onSpeak(
+                    speakAndFinish(
                         "Tumhari todo list: " +
                             todos.joinToString(". ")
                     )
@@ -469,15 +475,15 @@ class CommandExecutor(
                             .toString()
 
                     if (text.isBlank()) {
-                        onSpeak("Clipboard khaali hai")
+                        speakAndFinish("Clipboard khaali hai")
                     } else {
-                        onSpeak(
+                        speakAndFinish(
                             "Clipboard mein hai: $text"
                         )
                     }
 
                 } else {
-                    onSpeak("Clipboard khaali hai")
+                    speakAndFinish("Clipboard khaali hai")
                 }
             }
 
@@ -495,7 +501,7 @@ class CommandExecutor(
                     )
                 )
 
-                onSpeak("Clipboard mein copy kar diya")
+                speakAndFinish("Clipboard mein copy kar diya")
             }
 
             is Command.CreateContact -> {
@@ -527,12 +533,12 @@ class CommandExecutor(
 
                     context.startActivity(intent)
 
-                    onSpeak(
+                    speakAndFinish(
                         "${command.name} ka contact tayyar kar diya, Save dabana"
                     )
 
                 } catch (_: Exception) {
-                    onSpeak("Contact nahi bana paya")
+                    speakAndFinish("Contact nahi bana paya")
                 }
             }
 
@@ -541,7 +547,7 @@ class CommandExecutor(
             }
 
             is Command.ChatReply -> {
-                onSpeak(command.text)
+                speakAndFinish(command.text)
             }
 
             Command.LockPhone -> {
@@ -559,7 +565,7 @@ class CommandExecutor(
 
                 if (dpm.isAdminActive(adminComponent)) {
 
-                    onSpeak("Lock kar raha hoon")
+                    speakAndFinish("Lock kar raha hoon")
 
                     dpm.lockNow()
 
@@ -587,7 +593,7 @@ class CommandExecutor(
 
                     context.startActivity(intent)
 
-                    onSpeak(
+                    speakAndFinish(
                         "Pehle lock permission allow karo, ek baar hi dena hoga"
                     )
                 }
@@ -603,9 +609,9 @@ class CommandExecutor(
                         ?: emptyList()
 
                 if (notes.isEmpty()) {
-                    onSpeak("Koi note nahi hai")
+                    speakAndFinish("Koi note nahi hai")
                 } else {
-                    onSpeak(
+                    speakAndFinish(
                         "Tumhare notes hain: " +
                             notes.joinToString(". ")
                     )
@@ -620,7 +626,7 @@ class CommandExecutor(
                         Locale.getDefault()
                     ).format(Date())
 
-                onSpeak("Abhi time hai $time")
+                speakAndFinish("Abhi time hai $time")
             }
 
             Command.TellBattery -> {
@@ -635,7 +641,7 @@ class CommandExecutor(
                         BatteryManager.BATTERY_PROPERTY_CAPACITY
                     )
 
-                onSpeak(
+                speakAndFinish(
                     "Battery $level percent hai"
                 )
             }
@@ -653,7 +659,7 @@ class CommandExecutor(
                     AudioManager.FLAG_SHOW_UI
                 )
 
-                onSpeak("Volume badha diya")
+                speakAndFinish("Volume badha diya")
             }
 
             Command.VolumeDown -> {
@@ -669,17 +675,17 @@ class CommandExecutor(
                     AudioManager.FLAG_SHOW_UI
                 )
 
-                onSpeak("Volume kam kar diya")
+                speakAndFinish("Volume kam kar diya")
             }
 
             Command.FlashlightOn -> {
                 setTorch(true)
-                onSpeak("Torch jala diya")
+                speakAndFinish("Torch jala diya")
             }
 
             Command.FlashlightOff -> {
                 setTorch(false)
-                onSpeak("Torch bandh kar diya")
+                speakAndFinish("Torch bandh kar diya")
             }
 
             Command.OpenWifiSettings -> {
@@ -694,7 +700,7 @@ class CommandExecutor(
                     }
                 )
 
-                onSpeak(
+                speakAndFinish(
                     "WiFi settings khol raha hoon"
                 )
             }
@@ -711,7 +717,7 @@ class CommandExecutor(
                     }
                 )
 
-                onSpeak(
+                speakAndFinish(
                     "Bluetooth settings khol raha hoon"
                 )
             }
@@ -740,13 +746,13 @@ class CommandExecutor(
             Command.EnableAirTouch -> {
                 AirTouchSettings.setEnabled(context, true)
                 AirTouchForegroundService.start(context)
-                onSpeak("AirTouch enabled sir.")
+                speakAndFinish("AirTouch enabled sir.")
             }
 
             Command.DisableAirTouch -> {
                 AirTouchSettings.setEnabled(context, false)
                 AirTouchForegroundService.stop(context)
-                onSpeak("AirTouch disabled.")
+                speakAndFinish("AirTouch disabled.")
             }
 
             is Command.SetGesture -> {
@@ -767,9 +773,9 @@ class CommandExecutor(
                         allGestures.add(com.user.jarvis.gestures.models.GestureConfig("g_voice", "Voice Custom", shapeEnum, com.user.jarvis.gestures.models.Direction.NONE, actionEnum, true))
                     }
                     repository.saveGestures(allGestures)
-                    onSpeak("Gesture updated sir.")
+                    speakAndFinish("Gesture updated sir.")
                 } else {
-                    onSpeak("Sorry, I couldn't understand that gesture or action.")
+                    speakAndFinish("Sorry, I couldn't understand that gesture or action.")
                 }
             }
 
@@ -783,9 +789,9 @@ class CommandExecutor(
 
             is Command.ShowGamingStats -> {
                 if (!gamingModeManager.isGamingModeOn) {
-                    onSpeak("Gaming mode off hai, pehle use chalu karo.")
+                    speakAndFinish("Gaming mode off hai, pehle use chalu karo.")
                 } else {
-                    onSpeak("Gaming stats screen par update ho rahe hain sir.")
+                    speakAndFinish("Gaming stats screen par update ho rahe hain sir.")
                 }
             }
 
@@ -797,7 +803,7 @@ class CommandExecutor(
                 // Removing direct killBackgroundProcesses usage to adhere to Android's strict background execution policies
                 // and to prevent requiring unnecessary privileged permissions like KILL_BACKGROUND_PROCESSES.
                 // We notify the user that gaming mode is enabled without making false claims about killing apps.
-                onSpeak("Gaming mode enabled. Background optimizations active.")
+                speakAndFinish("Gaming mode enabled. Background optimizations active.")
             }
 
             is Command.ShowFreeFireProfile -> {
@@ -809,7 +815,7 @@ class CommandExecutor(
                     Sniper: ${gamingModeManager.ffSniperScopeSens}
                     Free Look: ${gamingModeManager.ffFreeLookSens}
                 """.trimIndent()
-                onSpeak("Yeh rahi aapki Free Fire sensitivity profile:\n$stats")
+                speakAndFinish("Yeh rahi aapki Free Fire sensitivity profile:\n$stats")
             }
 
             is Command.UpdateFreeFireProfile -> {
@@ -825,9 +831,9 @@ class CommandExecutor(
                     else -> updated = false
                 }
                 if (updated) {
-                    onSpeak("Maine $target sensitivity ${command.value} par set kar di hai.")
+                    speakAndFinish("Maine $target sensitivity ${command.value} par set kar di hai.")
                 } else {
-                    onSpeak("Samajh nahi aaya kaunsi setting update karni hai. (Options: general, red dot, 2x, 4x, sniper, free look)")
+                    speakAndFinish("Samajh nahi aaya kaunsi setting update karni hai. (Options: general, red dot, 2x, 4x, sniper, free look)")
                 }
             }
 
@@ -842,9 +848,9 @@ class CommandExecutor(
             Command.EditVideo -> {
                 val success = appLauncher.openApp("vn video editor")
                 if (success) {
-                    onSpeak("Opening editing suite.")
+                    speakAndFinish("Opening editing suite.")
                 } else {
-                    onSpeak("Video editor nahi mil raha")
+                    speakAndFinish("Video editor nahi mil raha")
                 }
             }
 
@@ -854,12 +860,12 @@ class CommandExecutor(
                     val adminComponent = android.content.ComponentName(context, JarvisDeviceAdminReceiver::class.java)
                     if (dpm.isAdminActive(adminComponent)) {
                         dpm.lockNow()
-                        onSpeak("Security protocol activated. System locked.")
+                        speakAndFinish("Security protocol activated. System locked.")
                     } else {
-                        onSpeak("Device admin permission chahiye")
+                        speakAndFinish("Device admin permission chahiye")
                     }
                 } catch (e: Exception) {
-                    onSpeak("Lock nahi kar paya")
+                    speakAndFinish("Lock nahi kar paya")
                 }
             }
 
@@ -874,13 +880,13 @@ class CommandExecutor(
                         val request = okhttp3.Request.Builder().url("https://rajebiz.wuaze.com").build()
                         httpClient.newCall(request).execute().use { response ->
                             if (response.isSuccessful) {
-                                Handler(Looper.getMainLooper()).post { onSpeak("Sir, your domain rajebiz is live and running.") }
+                                Handler(Looper.getMainLooper()).post { speakAndFinish("Sir, your domain rajebiz is live and running.") }
                             } else {
-                                Handler(Looper.getMainLooper()).post { onSpeak("Sir, the server seems to be unreachable at the moment.") }
+                                Handler(Looper.getMainLooper()).post { speakAndFinish("Sir, the server seems to be unreachable at the moment.") }
                             }
                         }
                     } catch (e: Exception) {
-                        Handler(Looper.getMainLooper()).post { onSpeak("Sir, the server seems to be unreachable at the moment.") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish("Sir, the server seems to be unreachable at the moment.") }
                     }
                 }.start()
             }
@@ -894,22 +900,22 @@ class CommandExecutor(
             }
 
             is Command.TrackFlights -> {
-                onSpeak("Opening flight tracking.")
+                speakAndFinish("Opening flight tracking.")
                 val intent = Intent(context, Class.forName("com.user.jarvis.FlightTrackerActivity")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
-                onFinished()
+                onFinished(true)
             }
 
             is Command.SearchFlight -> {
-                onSpeak("Searching for flight ${command.query}.")
+                speakAndFinish("Searching for flight ${command.query}.")
                 val intent = Intent(context, Class.forName("com.user.jarvis.FlightTrackerActivity")).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     putExtra("SEARCH_QUERY", command.query)
                 }
                 context.startActivity(intent)
-                onFinished()
+                onFinished(true)
             }
 
             is Command.FirstFlightDetails -> {
@@ -917,17 +923,17 @@ class CommandExecutor(
             }
 
             is Command.Unknown -> {
-                onSpeak("Samajh nahi aaya")
+                speakAndFinish("Samajh nahi aaya")
             }
         }
     }
 
-    private fun handleFirstFlightDetails(onFinished: () -> Unit) {
+    private fun handleFirstFlightDetails(onFinished: (Boolean) -> Unit) {
         val flights = FlightRepository.lastFetchedFlights
         if (flights.isNotEmpty()) {
             val first = flights.first()
             speakFlightDetails(first)
-            onFinished()
+            onFinished(true)
         } else {
             FlightRepository.fetchFlights(context, onSuccess = { fetchedFlights ->
                 Handler(Looper.getMainLooper()).post {
@@ -935,14 +941,14 @@ class CommandExecutor(
                         val first = fetchedFlights.first()
                         speakFlightDetails(first)
                     } else {
-                        onSpeak("No tracked flights available.")
+                        speakAndFinish("No tracked flights available.")
                     }
-                    onFinished()
+                    onFinished(true)
                 }
             }, onError = { errorMsg ->
                 Handler(Looper.getMainLooper()).post {
-                    onSpeak(errorMsg)
-                    onFinished()
+                    speakAndFinish(errorMsg)
+                    onFinished(true)
                 }
             })
         }
@@ -955,13 +961,13 @@ class CommandExecutor(
             "currently unavailable"
         }
         val message = "The first tracked flight is ${flight.flight}. The aircraft is an ${flight.type}. Its route is $route."
-        onSpeak(message)
+        speakAndFinish(message)
     }
 
-    private fun fetchTrainInfo(query: String, onFinished: () -> Unit) {
+    private fun fetchTrainInfo(query: String, onFinished: (Boolean) -> Unit) {
         val apiKey = ApiKeyManager.getRapidApiKey(context)
         if (apiKey.isBlank()) {
-            onSpeak("RapidAPI key nahi hai")
+            speakAndFinish("RapidAPI key nahi hai")
             return
         }
 
@@ -989,7 +995,7 @@ class CommandExecutor(
 
                     if (!response.isSuccessful) {
                         Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
-                        Handler(Looper.getMainLooper()).post { onSpeak("HTTP Error ${response.code}") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish("HTTP Error ${response.code}") }
                         return@use
                     }
 
@@ -1000,7 +1006,7 @@ class CommandExecutor(
 
                         if (parsed is JSONObject) {
                             if (!parsed.optBoolean("status", true)) {
-                                Handler(Looper.getMainLooper()).post { onSpeak("Train ka data nahi mila") }
+                                Handler(Looper.getMainLooper()).post { speakAndFinish("Train ka data nahi mila") }
                                 return@use
                             }
                             dataArray = parsed.optJSONArray("data")
@@ -1039,35 +1045,35 @@ class CommandExecutor(
 
                                 if (tName.isNotBlank() && tNum.isNotBlank()) {
                                     Handler(Looper.getMainLooper()).post {
-                                        onSpeak("Train hai: $tNum $tName")
-                                        onFinished()
+                                        speakAndFinish("Train hai: $tNum $tName")
+                                        onFinished(true)
                                     }
                                 } else {
-                                    Handler(Looper.getMainLooper()).post { onSpeak("Train detail theek se nahi mili") }
+                                    Handler(Looper.getMainLooper()).post { speakAndFinish("Train detail theek se nahi mili") }
                                 }
                             } else {
-                                Handler(Looper.getMainLooper()).post { onSpeak("Train object nahi mila") }
+                                Handler(Looper.getMainLooper()).post { speakAndFinish("Train object nahi mila") }
                             }
                         } else {
-                            Handler(Looper.getMainLooper()).post { onSpeak("Train nahi mili") }
+                            Handler(Looper.getMainLooper()).post { speakAndFinish("Train nahi mili") }
                         }
 
                     } catch (e: Exception) {
                         Log.e("TrainAPI", "JSON Parse error in fetchTrainInfo", e)
-                        Handler(Looper.getMainLooper()).post { onSpeak("Data parse karne me error aayi") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish("Data parse karne me error aayi") }
                     }
                 }
             } catch (e: Exception) {
                 Log.e("TrainAPI", "Network exception in fetchTrainInfo", e)
-                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Network Error") }
+                Handler(Looper.getMainLooper()).post { speakAndFinish(e.message ?: "Network Error") }
             }
         }.start()
     }
 
-    private fun fetchTrainStatus(trainNumber: String, onFinished: () -> Unit) {
+    private fun fetchTrainStatus(trainNumber: String, onFinished: (Boolean) -> Unit) {
         val apiKey = ApiKeyManager.getRapidApiKey(context)
         if (apiKey.isBlank()) {
-            onSpeak("RapidAPI key nahi hai")
+            speakAndFinish("RapidAPI key nahi hai")
             return
         }
 
@@ -1096,7 +1102,7 @@ class CommandExecutor(
 
                     if (!response.isSuccessful) {
                         Log.e("TrainAPI", "HTTP Error ${response.code}: $responseBody")
-                        Handler(Looper.getMainLooper()).post { onSpeak("HTTP Error ${response.code}") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish("HTTP Error ${response.code}") }
                         return@use
                     }
 
@@ -1177,7 +1183,7 @@ class CommandExecutor(
                             val statusMessage = "Train $trainNumber is at ${status.currentStationName}, delay is ${status.delay} minutes."
 
                             Handler(Looper.getMainLooper()).post {
-                                onSpeak(statusMessage)
+                                speakAndFinish(statusMessage)
 
                                 // Let's create a visual card if onShowView is available
                                 onShowView?.let { show ->
@@ -1185,20 +1191,20 @@ class CommandExecutor(
                                     show(card)
                                 }
 
-                                onFinished()
+                                onFinished(true)
                             }
                         } else {
                             Log.e("TrainAPI", "JSON Parsing Error: Expected JSONObject but got ${parsed?.javaClass?.simpleName}")
-                            Handler(Looper.getMainLooper()).post { onSpeak("JSON Parsing Error") }
+                            Handler(Looper.getMainLooper()).post { speakAndFinish("JSON Parsing Error") }
                         }
                     } catch (e: Exception) {
                         Log.e("TrainAPI", "JSON Parse error", e)
-                        Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Unknown Error") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish(e.message ?: "Unknown Error") }
                     }
                 }
             } catch (e: Exception) {
                 Log.e("TrainAPI", "Network exception in fetchTrainStatus", e)
-                Handler(Looper.getMainLooper()).post { onSpeak(e.message ?: "Unknown Error") }
+                Handler(Looper.getMainLooper()).post { speakAndFinish(e.message ?: "Unknown Error") }
             }
         }.start()
     }
@@ -1294,7 +1300,7 @@ class CommandExecutor(
         val apiKey = ApiKeyManager.getGroqApiKey(context)
         Log.d("GroqAPI", "Key length: ${apiKey.length}, value: '$apiKey'")
         if (apiKey.isBlank()) {
-            onSpeak("API key nahi hai")
+            speakAndFinish("API key nahi hai")
             return
         }
 
@@ -1325,16 +1331,16 @@ class CommandExecutor(
                     val root = org.json.JSONObject(responseText)
 
                     if (root.has("error")) {
-                        Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
+                        Handler(Looper.getMainLooper()).post { speakAndFinish("Mausam ka data nahi mil paaya") }
                         return@use
                     }
                     val rawText = root.getJSONArray("choices")
                         .getJSONObject(0).getJSONObject("message")
                         .getString("content")
-                    Handler(Looper.getMainLooper()).post { onSpeak(rawText.trim()) }
+                    Handler(Looper.getMainLooper()).post { speakAndFinish(rawText.trim()) }
                 }
             } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post { onSpeak("Mausam ka data nahi mil paaya") }
+                Handler(Looper.getMainLooper()).post { speakAndFinish("Mausam ka data nahi mil paaya") }
             }
         }.start()
     }
@@ -1347,7 +1353,7 @@ class CommandExecutor(
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            onSpeak(
+            speakAndFinish(
                 "Location permission nahi hai mausam batane ke liye"
             )
             return
@@ -1381,7 +1387,7 @@ class CommandExecutor(
 
         if (lat == null || lon == null) {
 
-            onSpeak(
+            speakAndFinish(
                 "Location nahi mil paayi, GPS on karke try karo"
             )
 
@@ -1441,7 +1447,7 @@ class CommandExecutor(
                         Handler(
                             Looper.getMainLooper()
                         ).post {
-                            onSpeak(message)
+                            speakAndFinish(message)
                         }
                     }
 
@@ -1450,7 +1456,7 @@ class CommandExecutor(
                 Handler(
                     Looper.getMainLooper()
                 ).post {
-                    onSpeak(
+                    speakAndFinish(
                         "Mausam ka data nahi mil paaya"
                     )
                 }
@@ -1580,13 +1586,13 @@ class CommandExecutor(
                 }
             )
 
-            onSpeak(
+            speakAndFinish(
                 "Share karne ka option khol raha hoon"
             )
 
         } catch (_: Exception) {
 
-            onSpeak(
+            speakAndFinish(
                 "Share nahi kar paya"
             )
         }
@@ -1618,7 +1624,7 @@ class CommandExecutor(
 
             context.startActivity(intent)
 
-            onSpeak(
+            speakAndFinish(
                 "Pehle Jarvis ko 'Do Not Disturb' permission do"
             )
 
@@ -1632,7 +1638,7 @@ class CommandExecutor(
 
         audioManager.ringerMode = mode
 
-        onSpeak(successMessage)
+        speakAndFinish(successMessage)
     }
 
     private fun setTorch(on: Boolean) {
@@ -1673,9 +1679,9 @@ class CommandExecutor(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            onSpeak("SMS access is restricted on this device. You can send the message manually.")
+            speakAndFinish("SMS access is restricted on this device. You can send the message manually.")
         } catch (e: Exception) {
-            onSpeak("Manual SMS nahi khul paya")
+            speakAndFinish("Manual SMS nahi khul paya")
         }
     }
 
