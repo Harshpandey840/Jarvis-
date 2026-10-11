@@ -123,14 +123,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val fileSummaryLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri -> if (uri != null) handleFileForSummary(uri) }
-
-    private val roleRequestLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            Toast.makeText(this, "Jarvis is now the default assistant", Toast.LENGTH_SHORT).show()
+    private val roleRequestLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(Context.ROLE_SERVICE) as RoleManager
+            if (roleManager.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+                Toast.makeText(this, "Jarvis is now the default assistant", Toast.LENGTH_SHORT).show()
+                assistantRoleStatusText.text = "ASSISTANT: DEFAULT"
+                assistantRoleStatusText.setTextColor(getColorCompat(R.color.accent_online_green))
+                assistantRoleEnableBtn.visibility = View.GONE
+            } else {
+                Toast.makeText(this, "Failed to set default assistant", Toast.LENGTH_SHORT).show()
+                assistantRoleStatusText.text = "ASSISTANT: NOT DEFAULT"
+                assistantRoleStatusText.setTextColor(getColorCompat(R.color.stop_red))
+                assistantRoleEnableBtn.visibility = View.VISIBLE
+            }
         } else {
             Toast.makeText(this, "Failed to set default assistant", Toast.LENGTH_SHORT).show()
+            assistantRoleStatusText.text = "ASSISTANT: NOT DEFAULT"
+            assistantRoleStatusText.setTextColor(getColorCompat(R.color.stop_red))
+            assistantRoleEnableBtn.visibility = View.VISIBLE
         }
-        updateAssistantRoleStatus()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -430,11 +442,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             systemSettingsEnableBtn.visibility = View.VISIBLE
         }
     }
-
-override fun onResume() {
+    override fun onResume() {
         super.onResume()
         updateGamingStatus()
         updateSystemSettingsUI()
+        updateAssistantRoleStatus()
 
         val filter = android.content.IntentFilter("com.user.jarvis.GAMING_MODE_UPDATED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

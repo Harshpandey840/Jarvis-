@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The official Android SDK requires a valid RecognitionService for the ROLE_ASSISTANT contract on Android 11-.
+    However, since Jarvis only uses a command-based AudioRecord wake-word pipeline locally (OpenWakeWord),
+    it cannot natively function as a system-wide continuous STT provider. We purposefully remove the
+    android:recognitionService attribute because proxying to Google or building a dummy service that
+    intentionally fails is structurally forbidden and risks breaking global system STT functionality.
+    This effectively means the app may not be fully recognized as an eligible ROLE_ASSISTANT candidate
+    on older Android versions, but it prevents system-level Voice Interaction regressions.
+-->
 <voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:sessionService="com.user.jarvis.assistant.JarvisVoiceInteractionSessionService"
-    android:recognitionService="com.user.jarvis.assistant.JarvisRecognitionService"
     android:supportsAssist="true"
     android:supportsLocalInteraction="true" />
