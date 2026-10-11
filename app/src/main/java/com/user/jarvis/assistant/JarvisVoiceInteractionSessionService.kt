@@ -6,6 +6,7 @@ import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService
 import com.user.jarvis.JarvisListenerService
 import android.content.Context
+import com.user.jarvis.MainActivity
 
 class JarvisVoiceInteractionSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession {
@@ -18,11 +19,25 @@ class JarvisVoiceInteractionSession(context: Context) : VoiceInteractionSession(
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
 
-        // When assistant is invoked, tell JarvisListenerService to start listening
+        // Launch MainActivity as Voice Activity
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        try {
+            startVoiceActivity(launchIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            try {
+                context.startActivity(launchIntent)
+            } catch (ex: Exception) {
+                ex.printStackTrace()
+            }
+        }
+
+        // Start listening
         val intent = Intent(context, JarvisListenerService::class.java).apply {
             action = "com.user.jarvis.ACTION_START_ASSISTANT_COMMAND"
         }
-
         try {
             context.startService(intent)
         } catch (e: Exception) {
@@ -34,7 +49,6 @@ class JarvisVoiceInteractionSession(context: Context) : VoiceInteractionSession(
             }
         }
 
-        // Hide UI immediately since Jarvis HUD handles it
         hide()
     }
 }

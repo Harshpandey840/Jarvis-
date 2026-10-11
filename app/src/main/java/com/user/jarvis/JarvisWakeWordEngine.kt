@@ -67,7 +67,7 @@ class JarvisWakeWordEngine(
                 scope!!
             )
 
-            Log.d(TAG, "Wake word engine initialized without internal audio recording")
+            Log.d(TAG, "Wake word engine initialized and model loaded successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word engine", e)
             running = false
