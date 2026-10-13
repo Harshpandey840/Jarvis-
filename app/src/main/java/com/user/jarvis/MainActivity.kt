@@ -928,7 +928,20 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
         override fun onError(error: Int) {
-            runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, "SYSTEM ERROR") }
+            val errorStr = when (error) {
+                SpeechRecognizer.ERROR_AUDIO -> "ERROR_AUDIO"
+                SpeechRecognizer.ERROR_CLIENT -> "ERROR_CLIENT"
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "ERROR_PERMISSIONS"
+                SpeechRecognizer.ERROR_NETWORK -> "ERROR_NETWORK"
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "ERROR_NETWORK_TIMEOUT"
+                SpeechRecognizer.ERROR_NO_MATCH -> "ERROR_NO_MATCH"
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "ERROR_RECOGNIZER_BUSY"
+                SpeechRecognizer.ERROR_SERVER -> "ERROR_SERVER"
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "ERROR_SPEECH_TIMEOUT"
+                else -> "SYSTEM ERROR"
+            }
+            android.util.Log.e("MainActivity", "SpeechRecognizer error: $errorStr ($error)")
+            runOnUiThread { JarvisHudAnimator.animateTextChange(stateLabel, errorStr) }
             particleOrb.currentState = JarvisCoreView.State.IDLE
             JarvisSoundManager.playError()
         }
