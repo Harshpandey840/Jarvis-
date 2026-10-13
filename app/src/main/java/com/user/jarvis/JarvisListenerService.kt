@@ -586,13 +586,15 @@ class JarvisListenerService : Service() {
         startCommandTimeout()
 
         // Show assistant session which brings up the HUD
-        try {
-            com.user.jarvis.assistant.JarvisVoiceInteractionService.instance?.showAssistantSession()
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "Failed to show assistant session", e)
+        val instance = com.user.jarvis.assistant.JarvisVoiceInteractionService.instance
+        if (instance != null) {
+            instance.showAssistantSession()
+            speak("Ji, bolo.")
+        } else {
+            android.util.Log.e(TAG, "Not default assistant! Cannot show session.")
+            speak("Main default assistant set nahi hoon. Kripya mujhe default assistant banayein.")
         }
 
-        speak("Ji, bolo.")
     }
 
 
@@ -738,8 +740,12 @@ class JarvisListenerService : Service() {
 
                         waitingForCommand = false
 
+                        android.util.Log.d(TAG, "SpeechRecognizer onResults: $spokenText")
+
                         if (spokenText.isBlank()) {
 
+                            // Explicitly restart audio thread
+                            speakThenListenForCommand = false
                             scheduleWakeWordRestart(
                                 300L
                             )
@@ -780,6 +786,18 @@ class JarvisListenerService : Service() {
 
         cancelWakeWordRestart()
         stopWakeWordDetection()
+
+        // Fix microphone contention by explicitly stopping and releasing AudioRecord
+        audioRecordThread?.interrupt()
+        audioRecordThread = null
+        try {
+            activeAudioRecord?.stop()
+        } catch (_: Exception) {}
+        try {
+            activeAudioRecord?.release()
+        } catch (_: Exception) {}
+        activeAudioRecord = null
+
         cancelRecognition()
 
         if (
@@ -817,6 +835,11 @@ class JarvisListenerService : Service() {
                 }
 
         startCommandTimeout()
+
+        android.util.Log.d(TAG, "Starting SpeechRecognizer for command listening")
+
+        // Prevent wake word loop from restarting during command recognition
+        cancelWakeWordRestart()
 
         val intent =
             Intent(
@@ -926,6 +949,7 @@ class JarvisListenerService : Service() {
                 if (waitingForCommand) {
 
                     waitingForCommand = false
+                    speakThenListenForCommand = false
 
                     cancelRecognition()
 
