@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.catch
 import java.io.File
 import java.io.FileOutputStream
 
@@ -53,6 +54,12 @@ class JarvisWakeWordEngine(
             return
         }
 
+        // Check if the model is genuinely valid (not 0 bytes)
+        if (file.length() == 0L) {
+            Log.e(TAG, "Model file is empty. Cannot initialize Wake Word Engine.")
+            return
+        }
+
         running = true
         scope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -60,13 +67,25 @@ class JarvisWakeWordEngine(
 
         try {
             wakeWordEngine = WakeWordEngine(
-                context,
-                listOf(model),
-                DetectionMode.SINGLE_BEST,
-                1000L,
-                scope!!
+                context = context,
+                models = listOf(model),
+                detectionMode = DetectionMode.SINGLE_BEST,
+                detectionCooldownMs = 1000L,
+                scope = scope!!
             )
 
+            scope?.launch {
+                wakeWordEngine?.detections?.catch { e ->
+                    Log.e(TAG, "Error collecting detections", e)
+                }?.collect { detection ->
+                    Log.d(TAG, "Wake word detected: \${detection.model.name} with score \${detection.score}")
+                    if (detection.score >= 0.5f) {
+                        notifyWakeWordDetected()
+                    }
+                }
+            }
+
+            wakeWordEngine?.start()
             Log.d(TAG, "Wake word engine initialized and model loaded successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word engine", e)
@@ -110,34 +129,13 @@ class JarvisWakeWordEngine(
         return running
     }
 
+    // ProcessAudioChunk remains empty as we rely on library's internal background thread
     fun processAudioChunk(audioBuffer: FloatArray): Float {
-        if (!running || wakeWordEngine == null) return 0f
-        var maxScore = 0f
-        try {
-            val engineClass = wakeWordEngine!!.javaClass
-            val fieldGetModelProcessors = engineClass.getDeclaredField("modelProcessors")
-            fieldGetModelProcessors.isAccessible = true
-            val map = fieldGetModelProcessors.get(wakeWordEngine!!) as Map<*, *>
-            for (processor in map.values) {
-                if (processor != null) {
-                    val processMethod = processor.javaClass.getDeclaredMethod("process", FloatArray::class.java)
-                    processMethod.isAccessible = true
-                    val score = processMethod.invoke(processor, audioBuffer) as Float
-                    if (score > maxScore) maxScore = score
-                }
-            }
-            if (maxScore >= 0.5f) {
-                notifyWakeWordDetected()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to process audio chunk via reflection", e)
-        }
-        return maxScore
+        return 0f
     }
 
     fun notifyWakeWordDetected() {
         if (!running) return
-
         try {
             onWakeWord()
         } catch (e: Exception) {
