@@ -401,6 +401,8 @@ class JarvisListenerService : Service() {
             if (serviceActive && currentState != AudioState.WAITING_FOR_WAKE_WORD) {
                 // Restart only if we can start
                 if (wakeWordEngine?.isRunning() == true || wakeWordEngine == null) {
+                    // Explicitly release SpeechRecognizer before restarting wake word
+                    cancelRecognition()
                     wakeWordEngine?.restart()
                 }
                 transitionToState(AudioState.STARTING_WAKE_WORD)

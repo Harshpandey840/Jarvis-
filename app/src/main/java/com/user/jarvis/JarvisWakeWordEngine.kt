@@ -17,23 +17,35 @@ import java.io.FileOutputStream
 class JarvisWakeWordEngine(
     private val context: Context,
     private val onWakeWord: () -> Unit
-) {
+) : IWakeWordDetector {
 
     companion object {
         private const val TAG = "JarvisWakeWordEngine"
     }
 
-    private var running = false
     private var wakeWordEngine: WakeWordEngine? = null
     private var scope: CoroutineScope? = null
     private var modelFile: File? = null
 
+    private val manager = WakeWordEngineManager(
+        modelProvider = {
+            val file = modelFile
+            if (file != null && file.exists()) {
+                Pair(file.absolutePath, file.length())
+            } else {
+                Pair(null, 0L)
+            }
+        },
+        detector = this,
+        onWakeWord = onWakeWord
+    )
+
     init {
         try {
             // Unpack model from assets
-            val file = File(context.filesDir, "hey_jarvis.tflite")
+            val file = File(context.filesDir, "hey_jarvis.onnx")
             if (!file.exists()) {
-                context.assets.open("hey_jarvis_v0.1.tflite").use { input ->
+                context.assets.open("hey_jarvis_v0.1.onnx").use { input ->
                     FileOutputStream(file).use { output ->
                         input.copyTo(output)
                     }
@@ -46,26 +58,30 @@ class JarvisWakeWordEngine(
     }
 
     fun start() {
-        if (running) return
+        manager.start()
+    }
 
-        val file = modelFile
-        if (file == null || !file.exists()) {
-            Log.e(TAG, "Model file missing")
-            return
-        }
+    fun stop() {
+        manager.stop()
+    }
 
-        // Check if the model is genuinely valid (not 0 bytes)
-        if (file.length() == 0L) {
-            Log.e(TAG, "Model file is empty. Cannot initialize Wake Word Engine.")
-            return
-        }
+    fun restart() {
+        manager.restart()
+    }
 
-        running = true
+    fun release() {
+        manager.release()
+    }
+
+    fun isRunning(): Boolean {
+        return manager.isRunning()
+    }
+
+    override fun startDetector(modelPath: String, onDetection: (score: Float) -> Unit): Boolean {
         scope = CoroutineScope(Dispatchers.Default + Job())
+        val model = WakeWordModel("hey_jarvis", modelPath, 0.5f)
 
-        val model = WakeWordModel("hey_jarvis", file.absolutePath, 0.5f)
-
-        try {
+        return try {
             wakeWordEngine = WakeWordEngine(
                 context = context,
                 models = listOf(model),
@@ -79,43 +95,31 @@ class JarvisWakeWordEngine(
                     Log.e(TAG, "Error collecting detections", e)
                 }?.collect { detection ->
                     Log.d(TAG, "Wake word detected: \${detection.model.name} with score \${detection.score}")
-                    if (detection.score >= 0.5f) {
-                        notifyWakeWordDetected()
-                    }
+                    onDetection(detection.score)
                 }
             }
 
             wakeWordEngine?.start()
             Log.d(TAG, "Wake word engine initialized and model loaded successfully")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start wake word engine", e)
-            running = false
+            false
         }
     }
 
-    fun stop() {
-        if (!running) return
-        running = false
-
+    override fun stopDetector() {
         try {
             wakeWordEngine?.stop()
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping", e)
         }
-
         scope?.cancel()
         scope = null
-
         Log.d(TAG, "Wake word engine stopped")
     }
 
-    fun restart() {
-        stop()
-        start()
-    }
-
-    fun release() {
-        stop()
+    override fun releaseDetector() {
         try {
             wakeWordEngine?.release()
             wakeWordEngine = null
@@ -123,23 +127,5 @@ class JarvisWakeWordEngine(
             Log.e(TAG, "Error releasing", e)
         }
         Log.d(TAG, "Wake word engine released")
-    }
-
-    fun isRunning(): Boolean {
-        return running
-    }
-
-    // ProcessAudioChunk remains empty as we rely on library's internal background thread
-    fun processAudioChunk(audioBuffer: FloatArray): Float {
-        return 0f
-    }
-
-    fun notifyWakeWordDetected() {
-        if (!running) return
-        try {
-            onWakeWord()
-        } catch (e: Exception) {
-            Log.e(TAG, "Wake word callback failed", e)
-        }
     }
 }
